@@ -87,3 +87,9 @@ subscriptions:
 
   - topic: /fmu/in/vehicle_trajectory_waypoint
     type: px4_msgs::msg::VehicleTrajectoryWaypoint
+
+  - topic: /fmu/in/fuel_cell
+    type: px4_msgs::msg::FuelCell
+
+  - topic: /fmu/in/noctua_sensors
+    type: px4_msgs::msg::NoctuaSensors
