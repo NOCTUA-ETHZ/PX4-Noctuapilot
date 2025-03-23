@@ -1,4 +1,8 @@
+#ifndef FUEL_CELL_HPP
+#define FUEL_CELL_HPP
+
 #include <uORB/topics/fuel_cell.h>
+#include <v2.0/common/mavlink.h>
 
 class MavlinkStreamFuelCell: public MavlinkStream
 {
@@ -66,3 +70,5 @@ protected:
 	}
 
 };
+
+#endif // FUEL_CELL_HPP

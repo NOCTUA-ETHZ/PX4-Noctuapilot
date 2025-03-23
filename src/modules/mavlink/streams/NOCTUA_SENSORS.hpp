@@ -1,4 +1,8 @@
+#ifndef NOCTUA_SENSORS_HPP
+#define NOCTUA_SENSORS_HPP
+
 #include <uORB/topics/noctua_sensors.h>
+#include <v2.0/common/mavlink.h>
 
 class MavlinkStreamNoctuaSensors : public MavlinkStream
 {
@@ -58,3 +62,5 @@ protected:
 		return false;
 	}
 };
+
+#endif // NOCTUA_SENSORS_HPP
