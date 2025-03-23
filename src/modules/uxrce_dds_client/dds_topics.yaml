@@ -47,6 +47,12 @@ publications:
   - topic: /fmu/out/vehicle_trajectory_waypoint_desired
     type: px4_msgs::msg::VehicleTrajectoryWaypoint
 
+  - topic: /fmu/out/fuel_cell
+    type: px4_msgs::msg::FuelCell
+
+  - topic: /fmu/out/noctua_sensors
+    type: px4_msgs::msg::NoctuaSensors
+
 subscriptions:
 
   - topic: /fmu/in/offboard_control_mode
