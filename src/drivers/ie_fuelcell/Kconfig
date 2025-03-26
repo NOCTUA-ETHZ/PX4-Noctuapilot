@@ -1,0 +1,5 @@
+menuconfig DRIVERS_ROBOCLAW
+	bool "ie_fuelcell"
+	default n
+	---help---
+		Enable support for roboclaw

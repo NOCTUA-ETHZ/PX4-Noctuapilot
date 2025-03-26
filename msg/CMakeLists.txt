@@ -85,6 +85,7 @@ set(msg_files
 	Event.msg
 	FailsafeFlags.msg
 	FailureDetectorStatus.msg
+	FuelCell.msg
 	FollowTarget.msg
 	FollowTargetEstimator.msg
 	FollowTargetStatus.msg
