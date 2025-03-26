@@ -1,43 +1,9 @@
-/****************************************************************************
- *
- *   Copyright (c) 2013-2023 PX4 Development Team. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- * 3. Neither the name PX4 nor the names of its contributors may be
- *    used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- ****************************************************************************/
-
 /**
- * @file Roboclaw.cpp
+ * @file IE_Fuelcell.cpp
  *
- * Roboclaw Motor Driver
+ * IE Fuel Cell Driver
  *
  * references:
- * http://downloads.orionrobotics.com/downloads/datasheets/motor_controller_robo_claw_R0401.pdf
  *
  */
 
@@ -52,15 +18,18 @@
 
 	 strncpy(_stored_baud_rate_parameter, bad_rate_parameter, sizeof(_stored_baud_rate_parameter) - 1);
 	 _stored_baud_rate_parameter[sizeof(_stored_baud_rate_parameter) - 1] = '\0'; // Ensure null-termination
+	 PX4_INFO("IE_Fuelcell created");
  }
 
  IE_Fuelcell::~IE_Fuelcell()
  {
+	PX4_WARN("Shuting down driver");
 	 close(_uart_fd);
  }
 
  int IE_Fuelcell::initializeUART()
  {
+	PX4_INFO("Initializing UART");
 	 // The Roboclaw has a serial communication timeout of 10ms
 	 // Add a little extra to account for timing inaccuracy
 	 static constexpr int TIMEOUT_US = 11_ms;
@@ -159,6 +128,7 @@
 
  void IE_Fuelcell::Run()
  {
+	PX4_INFO("Running");
 	 if (should_exit()) {
 		 ScheduleClear();
 		 exit_and_cleanup();
@@ -171,23 +141,34 @@
 		 _uart_initialized = true;
 	 }
 
-	 // check for parameter updates
-	 if (_parameter_update_sub.updated()) {
-		 // Read from topic to clear updated flag
-		 parameter_update_s parameter_update;
-		 _parameter_update_sub.copy(&parameter_update);
+	// Publish dummy fuel cell data
+	fuel_cell_s fuel_cell_msg{};
 
-		 updateParams();
-	 }
+	// Use hrt_absolute_time() for timestamp
+	fuel_cell_msg.timestamp = hrt_absolute_time();
 
+	// Dummy data generation
+	fuel_cell_msg.tankpressure = 50.5f;     // example pressure in bar
+	fuel_cell_msg.regpressure = 2.3f;       // regulator pressure
+	fuel_cell_msg.voltage = 12.6f;          // system voltage
+	fuel_cell_msg.outputpower = 100.0f;     // output power in watts
+	fuel_cell_msg.spmpower = 75.5f;         // some power metric
+	fuel_cell_msg.battpower = 25.5f;        // battery power
+	fuel_cell_msg.psustate = 1;             // PSU state (example)
 
-	//  if (readEncoder() != OK) {
-	// 	 PX4_ERR("Error reading encoders");
-	//  }
+	// Example info bytes
+	fuel_cell_msg.info[0] = 0xAA;
+	fuel_cell_msg.info[1] = 0x55;
+
+	// Publish the message
+	_fuel_cell_pub.publish(fuel_cell_msg);
+
+	ScheduleDelayed(1_s);
  }
 
  int IE_Fuelcell::task_spawn(int argc, char *argv[])
  {
+	PX4_INFO("Starting task_spawn");
 	 const char *device_name = argv[1];
 	 const char *baud_rate_parameter_value = argv[2];
 
@@ -196,7 +177,9 @@
 	 if (instance) {
 		 _object.store(instance);
 		 _task_id = task_id_is_work_queue;
-		 instance->ScheduleNow();
+		 //instance->ScheduleNow();
+		 instance->ScheduleOnInterval(1_s, 0);
+		 PX4_INFO("Task spawned");
 		 return OK;
 
 	 } else {
@@ -207,7 +190,6 @@
 	 _object.store(nullptr);
 	 _task_id = -1;
 
-	 printf("Ending task_spawn");
 
 	 return ERROR;
  }
@@ -230,12 +212,10 @@
 
  TEMPLATE TEMPLATE
 
- In order to use this driver, the Roboclaw should be put into Packet Serial mode (see the linked documentation), and
- your flight controller's UART port should be connected to the Roboclaw as shown in the documentation.
- The driver needs to be enabled using the parameter `RBCLW_SER_CFG`, the baudrate needs to be set correctly and
- the address `RBCLW_ADDRESS` needs to match the ESC configuration.
 
- The command to start this driver is: `$ roboclaw start <UART device> <baud rate>`
+ The driver needs to be enabled using the parameter `IEFC_SER_CFG` and the baudrate needs to be set correctly.
+
+ The command to start this driver is: `$ ie_fuelcell start <UART device> <baud rate>`
  )DESCR_STR");
 
 	 PRINT_MODULE_USAGE_NAME("ie_fuelcell", "driver");
@@ -246,7 +226,7 @@
 
  int IE_Fuelcell::print_status()
  {
-	 return 0;
+	 return 1;
  }
 
 

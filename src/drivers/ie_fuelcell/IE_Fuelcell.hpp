@@ -48,8 +48,6 @@
 
  private:
 
-
-
 	 uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 	 uORB::Publication<fuel_cell_s> _fuel_cell_pub{ORB_ID(fuel_cell)};
 
