@@ -6,9 +6,10 @@
  * references:
  *
  */
-
  #include "IE_Fuelcell.hpp"
  #include <termios.h>
+
+
 
  IE_Fuelcell::IE_Fuelcell(const char *device_name, const char *baud_rate_parameter) :
 	 OutputModuleInterface(MODULE_NAME, px4::wq_configurations::hp_default)
@@ -16,6 +17,9 @@
 	 strncpy(_stored_device_name, device_name, sizeof(_stored_device_name) - 1);
 	 _stored_device_name[sizeof(_stored_device_name) - 1] = '\0'; // Ensure null-termination
 	 PX4_INFO("IE_Fuelcell created");
+
+	 strncpy(_stored_baud_rate_parameter, baud_rate_parameter, sizeof(_stored_baud_rate_parameter) - 1);
+	 _stored_baud_rate_parameter[sizeof(_stored_baud_rate_parameter) - 1] = '\0'; // Ensure null-termination
  }
 
  IE_Fuelcell::~IE_Fuelcell()
@@ -27,14 +31,21 @@
  int IE_Fuelcell::initializeUART()
  {
 	PX4_INFO("Initializing UART");
-	mavlink_log_info(_mavlink_log_pub, "Succesfully try connecting to fc");
 
 	 static constexpr int TIMEOUT_US = 11_ms;
 	 _uart_fd_timeout = { .tv_sec = 0, .tv_usec = TIMEOUT_US };
 
 	 int32_t baud_rate_parameter_value{0};
 	 int32_t baud_rate_posix{0};
-	 param_get(param_find(_stored_baud_rate_parameter), &baud_rate_parameter_value);
+
+	// Get baud rate parameter value
+	// int ret = param_get(param_find(_stored_baud_rate_parameter), &baud_rate_parameter_value);
+	// if (ret != PX4_OK) {
+	// 	PX4_ERR("Failed to get baud rate parameter");
+	// 	return -1;
+	// }
+	int ret = 0;
+	baud_rate_parameter_value = 9600; //temporary fix
 
 	 switch (baud_rate_parameter_value) {
 	 case 0: // Auto
@@ -69,72 +80,105 @@
 	 // start serial port
 	 _uart_fd = open(_stored_device_name, O_RDWR | O_NOCTTY);
 
-	 if (_uart_fd < 0) { err(1, "could not open %s", _stored_device_name); }
+	 if (_uart_fd < 0) {
+		PX4_ERR("could not open %s", _stored_device_name);
+		return PX4_ERROR;
+	    }
 
-	 int ret = 0;
-	 struct termios uart_config {};
-	 ret = tcgetattr(_uart_fd, &uart_config);
+	    struct termios uart_config;
+	    memset(&uart_config, 0, sizeof(uart_config));
+	    ret = tcgetattr(_uart_fd, &uart_config);
+	    if (ret < 0) {
+		PX4_ERR("failed to get attr");
+		close(_uart_fd);
+		_uart_fd = -1;
+		return PX4_ERROR;
+	    }
 
-	 if (ret < 0) { err(1, "failed to get attr"); }
+	    // Set non-canonical mode to read raw data
+	    uart_config.c_lflag &= ~(ICANON | ECHO);
+	    uart_config.c_cc[VMIN]  = 0;
+	    uart_config.c_cc[VTIME] = 1; // 0.1 sec read timeout
 
-	// Set non-canonical mode to read raw data
-	uart_config.c_lflag &= ~(ICANON | ECHO);
-	uart_config.c_cc[VMIN]  = 0;
-	uart_config.c_cc[VTIME] = 1; // 0.1 sec read timeout
+	    uart_config.c_oflag &= ~ONLCR;  // Do not translate NL to CR
+	    uart_config.c_cflag &= ~CRTSCTS; // Disable hardware flow control
 
-	uart_config.c_oflag &= ~ONLCR;  // Do not translate NL to CR
-	uart_config.c_cflag &= ~CRTSCTS; // Disable hardware flow control
+	    // Set baud rate
+	    ret = cfsetispeed(&uart_config, baud_rate_posix);
+	    if (ret < 0) {
+		PX4_ERR("failed to set input speed");
+		close(_uart_fd);
+		_uart_fd = -1;
+		return PX4_ERROR;
+	    }
 
-	 // Set baud rate
-	 ret = cfsetispeed(&uart_config, baud_rate_posix);
+	    ret = cfsetospeed(&uart_config, baud_rate_posix);
+	    if (ret < 0) {
+		PX4_ERR("failed to set output speed");
+		close(_uart_fd);
+		_uart_fd = -1;
+		return PX4_ERROR;
+	    }
 
-	 if (ret < 0) { err(1, "failed to set input speed"); }
+	    ret = tcsetattr(_uart_fd, TCSANOW, &uart_config);
+	    if (ret < 0) {
+		PX4_ERR("failed to set attr");
+		close(_uart_fd);
+		_uart_fd = -1;
+		return PX4_ERROR;
+	    }
 
-	 ret = cfsetospeed(&uart_config, baud_rate_posix);
+	    FD_ZERO(&_uart_fd_set);
+	    FD_SET(_uart_fd, &_uart_fd_set);
 
-	 if (ret < 0) { err(1, "failed to set output speed"); }
+	    tcflush(_uart_fd, TCIOFLUSH);
 
-	 ret = tcsetattr(_uart_fd, TCSANOW, &uart_config);
-
-	 if (ret < 0) { err(1, "failed to set attr"); }
-
-	 FD_ZERO(&_uart_fd_set);
-	 FD_SET(_uart_fd, &_uart_fd_set);
-
-	tcflush(_uart_fd, TCIOFLUSH);
-
-
-	 PX4_INFO("Successfully connected");
-	 mavlink_log_info(_mavlink_log_pub, "Succesfully connected to Fuel Cell");
-
-	 return OK;
+	    return PX4_OK;
  }
 
 
  void IE_Fuelcell::Run()
  {
-	 if (should_exit()) {
-		 ScheduleClear();
-		 exit_and_cleanup();
-		 return;
-	 }
+	if (should_exit()) {
+		ScheduleClear();
+		exit_and_cleanup();
+		return;
+	}
 
 
-	 if (!_uart_initialized) {
-		 initializeUART();
-		 _uart_initialized = true;
-	 }
+	if (!_uart_initialized) {
+		if (initializeUART() == PX4_OK) {
+			_uart_initialized = true;
+		}
+		else {
+			PX4_WARN("UART initialization failed, will retry...");
+			ScheduleDelayed(200_ms);
+			return;
+		}
+	}
 
-	 fuel_cell_s _data;
-	 readData(_data);
+	if (_uart_initialized) {
+		fuel_cell_s data;
+		// Try reading data; if reading fails, mark UART as uninitialized so that
+		// the next Run() attempt will try to reinitialize the port.
+		if (readData(data) != PX4_OK) {
+		    PX4_WARN("Failed to read data, attempting to reconnect...");
+		    _uart_initialized = false;
+		    if (_uart_fd >= 0) {
+			close(_uart_fd);
+			_uart_fd = -1;
+		    }
+		}
+	}
 
-	 // Run at 5 Hz
+	// Run at 5 Hz
 	ScheduleDelayed(200_ms);
- }
+	return;
+}
+
 
  int IE_Fuelcell::readData(fuel_cell_s &data)
  {
-	mavlink_log_info(_mavlink_log_pub, "Reading FC DATA");
      char buf[256];
      memset(buf, 0, sizeof(buf));
 
@@ -144,14 +188,14 @@
      int ret = select(_uart_fd + 1, &readfds, NULL, NULL, &timeout);
      if (ret <= 0) {
 	 PX4_ERR("UART read timeout");
-	 return -1;
+	 return PX4_ERROR;
      }
 
      // Read data from the UART
      ssize_t n = read(_uart_fd, buf, sizeof(buf) - 1);
      if (n <= 0) {
 	 PX4_ERR("Failed to read from UART");
-	 return -1;
+	 return PX4_ERROR;
      }
      buf[n] = '\0';
 
@@ -160,14 +204,14 @@
      char *end   = strchr(buf, '>');
      if (!start || !end || start >= end) {
 	 PX4_ERR("Invalid data format received");
-	 return -1;
+	 return PX4_ERROR;
      }
 
      // Copy the data between '<' and '>' into a temporary buffer
      size_t data_len = end - start - 1;
      if (data_len >= sizeof(buf)) {
 	 PX4_ERR("Data string too long");
-	 return -1;
+	 return PX4_ERROR;
      }
      char dataStr[256];
      memcpy(dataStr, start + 1, data_len);
@@ -186,7 +230,7 @@
      // Ensure we have the expected number of tokens (at least 12).
      if (token_count < 12) {
 	 PX4_ERR("Incomplete data received");
-	 return -1;
+	 return PX4_ERROR;
      }
 
      // Parse tokens based on the new UART format:
@@ -207,6 +251,18 @@
      data.suberror     = atoi(tokens[9]);
      // tokens[10] (info string) and tokens[11] (checksum) are not used here
 
+     PX4_INFO("Tank pressure: %.2f, Regulated pressure: %.2f, Voltage: %.2f, Output power: %.2f, SPM power: %.2f, Battery power: %.2f, PSU state: %ld, Main error: %ld, Sub error: %ld",
+	(double)data.tankpressure,
+	(double)data.regpressure,
+	(double)data.voltage,
+	(double)data.outputpower,
+	(double)data.spmpower,
+	(double)data.battpower,
+	(long)data.psustate,
+	(long)data.mainerror,
+	(long)data.suberror);
+
+
      publishData(data);
      return PX4_OK;
  }
@@ -214,7 +270,6 @@
 
 int IE_Fuelcell::publishData(const fuel_cell_s &data)
 {
-	mavlink_log_info(_mavlink_log_pub, "Publishing FC DATA");
 	// Publish dummy fuel cell data
 	fuel_cell_s fuel_cell_msg{};
 	fuel_cell_msg.timestamp = hrt_absolute_time();

@@ -11,7 +11,6 @@
  #include <sys/select.h>
 
  #include <uORB/Subscription.hpp>
- #include <uORB/topics/actuator_armed.h>
  #include <uORB/topics/parameter_update.h>
 
  #include <uORB/Publication.hpp>
@@ -20,20 +19,16 @@
 
  #include <px4_platform_common/log.h>
  #include <uORB/topics/vehicle_command.h>
- #include <uORB/Publication.hpp>
  #include <systemlib/mavlink_log.h>
  #include <uORB/topics/mavlink_log.h>
 
 
-//  DEFINE_PARAMETERS(
-// 	(ParamInt<px4::params::IEFC_ADDRESS>) _param_iefc_address,
-// )
 
  class IE_Fuelcell : public ModuleBase<IE_Fuelcell>, public OutputModuleInterface //public px4::ScheduledWorkItem, public ModuleParams
  {
  public:
 	 /**
-	  * @param device_name Name of the serial port e.g. "/dev/ttyS2"
+	  * @param device_name Name of the serial port e.g. "/dev/ttyS3"
 	  * @param bad_rate_parameter Name of the parameter that holds the baud rate of this serial port
 	  */
 	 IE_Fuelcell(const char *device_name, const char *bad_rate_parameter);
@@ -48,7 +43,6 @@
 	 void Run() override;
 	 int readData(fuel_cell_s &data);
 	 int publishData(const fuel_cell_s &data);
-
 
 
 	// Implement pure virtual methods from OutputModuleInterface
