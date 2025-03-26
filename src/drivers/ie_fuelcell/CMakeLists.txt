@@ -4,7 +4,11 @@ px4_add_module(
 	COMPILE_FLAGS
 		-DDEBUG_BUILD
 	SRCS
-		IE_Fuelcell.cpp
+		ie_fuelcell.cpp
+		ie_fuelcell.hpp
+		ie_fuelcell_main.cpp
+	DEPENDS
+		px4_work_queue
 	MODULE_CONFIG
 		module.yaml
 	)
