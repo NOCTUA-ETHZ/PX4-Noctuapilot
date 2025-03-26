@@ -2,4 +2,4 @@ menuconfig DRIVERS_IE_FUELCELL
 	bool "ie_fuelcell"
 	default y
 	---help---
-		Enable support for roboclaw
+		Enable support for IE FC

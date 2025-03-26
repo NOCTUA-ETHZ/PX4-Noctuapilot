@@ -59,7 +59,7 @@
 	 close(_uart_fd);
  }
 
- int IE_Fuelcell::IE_Fuelcell()
+ int IE_Fuelcell::initializeUART()
  {
 	 // The Roboclaw has a serial communication timeout of 10ms
 	 // Add a little extra to account for timing inaccuracy
@@ -139,40 +139,25 @@
 	 FD_ZERO(&_uart_fd_set);
 	 FD_SET(_uart_fd, &_uart_fd_set);
 
-	 // Make sure the device does respond
-	 static constexpr int READ_STATUS_RESPONSE_SIZE = 6;
-	 uint8_t response_buffer[READ_STATUS_RESPONSE_SIZE];
+	//  // Make sure the device does respond
+	//  static constexpr int READ_STATUS_RESPONSE_SIZE = 6;
+	//  uint8_t response_buffer[READ_STATUS_RESPONSE_SIZE];
 
-	 if (receiveTransaction(Command::ReadStatus, response_buffer, READ_STATUS_RESPONSE_SIZE) < READ_STATUS_RESPONSE_SIZE) {
-		 PX4_ERR("No valid response, stopping driver");
-		 request_stop();
-		 return ERROR;
+	//  if (receiveTransaction(Command::ReadStatus, response_buffer, READ_STATUS_RESPONSE_SIZE) < READ_STATUS_RESPONSE_SIZE) {
+	// 	 PX4_ERR("No valid response, stopping driver");
+	// 	 request_stop();
+	// 	 return ERROR;
 
-	 } else {
-		 PX4_INFO("Successfully connected");
-		 return OK;
-	 }
+	//  } else {
+	// 	 PX4_INFO("Successfully connected");
+	// 	 return OK;
+	//  }
+	 PX4_INFO("Successfully connected");
+	 return OK;
  }
 
- bool IE_Fuelcell::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
-			      unsigned num_outputs, unsigned num_control_groups_updated)
- {
-	 float right_motor_output = ((float)outputs[0] - 128.0f) / 127.f;
-	 float left_motor_output = ((float)outputs[1] - 128.0f) / 127.f;
 
-	 if (stop_motors) {
-		 setMotorSpeed(Motor::Right, 0.f);
-		 setMotorSpeed(Motor::Left, 0.f);
-
-	 } else {
-		 setMotorSpeed(Motor::Right, right_motor_output);
-		 setMotorSpeed(Motor::Left, left_motor_output);
-	 }
-
-	 return true;
- }
-
- void IE_FuelCell::Run()
+ void IE_Fuelcell::Run()
  {
 	 if (should_exit()) {
 		 ScheduleClear();
@@ -196,201 +181,17 @@
 	 }
 
 
-	 if (readEncoder() != OK) {
-		 PX4_ERR("Error reading encoders");
-	 }
+	//  if (readEncoder() != OK) {
+	// 	 PX4_ERR("Error reading encoders");
+	//  }
  }
-
- int Roboclaw::readEncoder()
- {
-	 static constexpr int ENCODER_MESSAGE_SIZE = 10; // response size for ReadEncoderCounters
-	 static constexpr int ENCODER_SPEED_MESSAGE_SIZE = 7; // response size for CMD_READ_SPEED_{1,2}
-
-	 uint8_t buffer_positon[ENCODER_MESSAGE_SIZE];
-	 uint8_t buffer_speed_right[ENCODER_SPEED_MESSAGE_SIZE];
-	 uint8_t buffer_speed_left[ENCODER_SPEED_MESSAGE_SIZE];
-
-	 if (receiveTransaction(Command::ReadSpeedMotor1, buffer_speed_right,
-				ENCODER_SPEED_MESSAGE_SIZE) < ENCODER_SPEED_MESSAGE_SIZE) {
-		 return ERROR;
-	 }
-
-	 if (receiveTransaction(Command::ReadSpeedMotor2, buffer_speed_left,
-				ENCODER_SPEED_MESSAGE_SIZE) < ENCODER_SPEED_MESSAGE_SIZE) {
-		 return ERROR;
-	 }
-
-	 if (receiveTransaction(Command::ReadEncoderCounters, buffer_positon, ENCODER_MESSAGE_SIZE) < ENCODER_MESSAGE_SIZE) {
-		 return ERROR;
-	 }
-
-	 int32_t speed_right = swapBytesInt32(&buffer_speed_right[0]);
-	 int32_t speed_left = swapBytesInt32(&buffer_speed_left[0]);
-	 int32_t position_right = swapBytesInt32(&buffer_positon[0]);
-	 int32_t position_left = swapBytesInt32(&buffer_positon[4]);
-
-	 wheel_encoders_s wheel_encoders{};
-	 wheel_encoders.wheel_speed[0] = static_cast<float>(speed_right) / _param_rbclw_counts_rev.get() * M_TWOPI_F;
-	 wheel_encoders.wheel_speed[1] = static_cast<float>(speed_left) / _param_rbclw_counts_rev.get() * M_TWOPI_F;
-	 wheel_encoders.wheel_angle[0] = static_cast<float>(position_right) / _param_rbclw_counts_rev.get() * M_TWOPI_F;
-	 wheel_encoders.wheel_angle[1] = static_cast<float>(position_left) / _param_rbclw_counts_rev.get() * M_TWOPI_F;
-	 wheel_encoders.timestamp = hrt_absolute_time();
-	 _wheel_encoders_pub.publish(wheel_encoders);
-
-	//  return OK;
- }
-
-
-
- void IE_Fuelcell::sendUnsigned7Bit(Command command, float data)
- {
-	 data = fabs(data);
-
-	 if (data >= 1.0f) {
-		 data = 0.99f;
-	 }
-
-	 auto byte = (uint8_t)(data * INT8_MAX);
-	 sendTransaction(command, &byte, 1);
- }
-
- void IE_Fuelcell::sendSigned16Bit(Command command, float data)
- {
-	 int16_t value = math::constrain(data, -1.f, 1.f) * INT16_MAX;
-	 uint8_t buff[2];
-	 buff[0] = (value >> 8) & 0xFF; // High byte
-	 buff[1] = value & 0xFF; // Low byte
-	 sendTransaction(command, (uint8_t *) &buff, 2);
- }
-
- int IE_Fuelcell::sendTransaction(Command cmd, uint8_t *write_buffer, size_t bytes_to_write)
- {
-	 if (writeCommandWithPayload(cmd, write_buffer, bytes_to_write) != OK) {
-		 return ERROR;
-	 }
-
-	 return readAcknowledgement();
- }
-
-
- int IE_Fuelcell::readAcknowledgement()
- {
-	 int select_status = select(_uart_fd + 1, &_uart_fd_set, nullptr, nullptr, &_uart_fd_timeout);
-
-	 if (select_status <= 0) {
-		 PX4_ERR("ACK timeout");
-		 return ERROR;
-	 }
-
-	 uint8_t acknowledgement{0};
-	 int bytes_read = read(_uart_fd, &acknowledgement, 1);
-
-	 if ((bytes_read != 1) || (acknowledgement != 0xFF)) {
-		 PX4_ERR("ACK wrong");
-		 return ERROR;
-	 }
-
-	 return OK;
- }
-
- int IE_Fuelcell::receiveTransaction(Command command, uint8_t *read_buffer, size_t bytes_to_read)
- {
-	 if (writeCommand(command) != OK) {
-		 return ERROR;
-	 }
-
-	 return readResponse(command, read_buffer, bytes_to_read);
- }
-
- int IE_Fuelcell::writeCommand(Command command)
- {
-	 uint8_t buffer[2];
-
-	 // Just address + command ID
-	 buffer[0] = (uint8_t)_param_iefc_address.get();
-	 buffer[1] = static_cast<uint8_t>(command);
-
-	 size_t bytes_written = write(_uart_fd, buffer, 2);
-
-	 if (bytes_written < 2) {
-		 PX4_ERR("Only wrote %d out of %d bytes", bytes_written, 2);
-		 return ERROR;
-	 }
-
-	 return OK;
- }
-
- int IE_Fuelcell::readResponse(Command command, uint8_t *read_buffer, size_t bytes_to_read)
- {
-	 size_t total_bytes_read = 0;
-
-	 while (total_bytes_read < bytes_to_read) {
-		 int select_status = select(_uart_fd + 1, &_uart_fd_set, nullptr, nullptr, &_uart_fd_timeout);
-
-		 if (select_status <= 0) {
-			 PX4_ERR("Select timeout %d\n", select_status);
-			 return ERROR;
-		 }
-
-		 int bytes_read = read(_uart_fd, &read_buffer[total_bytes_read], bytes_to_read - total_bytes_read);
-
-		 if (bytes_read <= 0) {
-			 PX4_ERR("Read timeout %d\n", select_status);
-			 return ERROR;
-		 }
-
-		 total_bytes_read += bytes_read;
-	 }
-
-	 if (total_bytes_read < 2) {
-		 PX4_ERR("Too short payload received\n");
-		 return ERROR;
-	 }
-
-	 // Verify response checksum
-	 uint8_t address = static_cast<uint8_t>(_param_iefc_address.get());
-	 uint8_t command_byte = static_cast<uint8_t>(command);
-	 uint16_t crc_calculated = _calcCRC(&address, 1); // address
-	 crc_calculated = _calcCRC(&command_byte, 1, crc_calculated); // command
-	 crc_calculated = _calcCRC(read_buffer, total_bytes_read - 2, crc_calculated); // received payload
-	 uint16_t crc_received = (read_buffer[total_bytes_read - 2] << 8) + read_buffer[total_bytes_read - 1];
-
-	 if (crc_calculated != crc_received) {
-		 PX4_ERR("Checksum mismatch\n");
-		 return ERROR;
-	 }
-
-	 return total_bytes_read;
- }
-
- uint16_t IE_Fuelcell::_calcCRC(const uint8_t *buffer, size_t bytes, uint16_t init)
- {
-	 uint16_t crc = init;
-
-	 for (size_t byte = 0; byte < bytes; byte++) {
-		 crc = crc ^ (((uint16_t) buffer[byte]) << 8);
-
-		 for (uint8_t bit = 0; bit < 8; bit++) {
-			 if (crc & 0x8000) {
-				 crc = (crc << 1) ^ 0x1021;
-
-			 } else {
-				 crc = crc << 1;
-			 }
-		 }
-	 }
-
-	 return crc;
- }
-
-
 
  int IE_Fuelcell::task_spawn(int argc, char *argv[])
  {
 	 const char *device_name = argv[1];
 	 const char *baud_rate_parameter_value = argv[2];
 
-	 IE_Fuelcell *instance = new IE_Fuelcellw(device_name, baud_rate_parameter_value);
+	 IE_Fuelcell *instance = new IE_Fuelcell(device_name, baud_rate_parameter_value);
 
 	 if (instance) {
 		 _object.store(instance);
@@ -443,12 +244,28 @@
 	 return 0;
  }
 
- int Roboclaw::print_status()
+ int IE_Fuelcell::print_status()
  {
 	 return 0;
  }
 
+
+ bool IE_Fuelcell::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
+	unsigned num_outputs, unsigned num_control_groups_updated)
+{
+	return false;
+}
+
+void IE_Fuelcell::updateParams()
+{
+	PX4_INFO("Fuel cell parameters updated");
+}
+
+
+
+
+
  extern "C" __EXPORT int ie_fuelcell_main(int argc, char *argv[])
  {
-	 return Roboclaw::main(argc, argv);
+	 return IE_Fuelcell::main(argc, argv);
  }

@@ -6,23 +6,23 @@ serial_config:
       group: IE_Fuelcell
 
 
-parameters:
-  - group: IE FuelCell Driver
-    definitions:
-      IEFC_ADDRESS:
-        description:
-          short: Address of the ESC on the bus
-          long: The ESC has to be configured to have an address from 0x80 to 0x87. This parameter needs to match the configured value.
-        type: enum
-        default: 128
-        min: 128
-        max: 135
-        values:
-          128: '0x80'
-          129: '0x81'
-          130: '0x82'
-          131: '0x83'
-          132: '0x84'
-          133: '0x85'
-          134: '0x86'
-          135: '0x87'
+# parameters:
+#   - group: IE FuelCell Driver
+#     definitions:
+#       IEFC_ADDRESS:
+#         description:
+#           short: Address of the ESC on the bus
+#           long: The ESC has to be configured to have an address from 0x80 to 0x87. This parameter needs to match the configured value.
+#         type: enum
+#         default: 128
+#         min: 128
+#         max: 135
+#         values:
+#           128: '0x80'
+#           129: '0x81'
+#           130: '0x82'
+#           131: '0x83'
+#           132: '0x84'
+#           133: '0x85'
+#           134: '0x86'
+#           135: '0x87'
