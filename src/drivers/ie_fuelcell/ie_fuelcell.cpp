@@ -37,6 +37,13 @@
  #include <fcntl.h>
  #include <termios.h>
 
+ #include <px4_platform_common/log.h>
+ #include <uORB/topics/vehicle_command.h>
+ #include <uORB/Publication.hpp>
+ #include <systemlib/mavlink_log.h>
+
+extern orb_advert_t mavlink_log_pub;
+
  /* Configuration Constants */
  #define LW_TAKE_RANGE_REG		'd'
 
@@ -76,6 +83,7 @@
  IeFuelcell::init()
  {
 	PX4_INFO("IeFuelcell::init");
+	mavlink_log_info(&mavlink_log_pub, "IE Fuelcell driver started");
 	//  int32_t hw_model = 0;
 	//  param_get(param_find("SENS_EN_SF0X"), &hw_model);
 
@@ -166,27 +174,6 @@
 	 perf_begin(_sample_perf);
 	 PX4_INFO("IeFuelcell::collect");
 
-	 	// Publish dummy fuel cell data
-	fuel_cell_s fuel_cell_msg{};
-
-	// Use hrt_absolute_time() for timestamp
-	fuel_cell_msg.timestamp = hrt_absolute_time();
-
-	// Dummy data generation
-	fuel_cell_msg.tankpressure = 50.5f;     // example pressure in bar
-	fuel_cell_msg.regpressure = 2.3f;       // regulator pressure
-	fuel_cell_msg.voltage = 12.6f;          // system voltage
-	fuel_cell_msg.outputpower = 100.0f;     // output power in watts
-	fuel_cell_msg.spmpower = 75.5f;         // some power metric
-	fuel_cell_msg.battpower = 25.5f;        // battery power
-	fuel_cell_msg.psustate = 1;             // PSU state (example)
-
-	// Example info bytes
-	fuel_cell_msg.info[0] = 0xAA;
-	fuel_cell_msg.info[1] = 0x55;
-
-	// Publish the message
-	_fuel_cell_pub.publish(fuel_cell_msg);
 
 	//  /* clear buffer if last read was too long ago */
 	//  int64_t read_elapsed = hrt_elapsed_time(&_last_read);
@@ -281,7 +268,35 @@
 
  void IeFuelcell::Run()
  {
-	PX4_INFO("IeFuelcell::Run");
+
+	PX4_INFO("RUnning IeFuelcell::Run");
+	mavlink_log_info(&mavlink_log_pub, "IE Fuelcell driver running");
+
+	// Publish dummy fuel cell data
+		fuel_cell_s fuel_cell_msg{};
+
+		// Use hrt_absolute_time() for timestamp
+		fuel_cell_msg.timestamp = hrt_absolute_time();
+
+		// Dummy data generation
+		fuel_cell_msg.tankpressure = 50.5f;     // example pressure in bar
+		fuel_cell_msg.regpressure = 2.3f;       // regulator pressure
+		fuel_cell_msg.voltage = 12.6f;          // system voltage
+		fuel_cell_msg.outputpower = 100.0f;     // output power in watts
+		fuel_cell_msg.spmpower = 75.5f;         // some power metric
+		fuel_cell_msg.battpower = 25.5f;        // battery power
+		fuel_cell_msg.psustate = 1;             // PSU state (example)
+
+		// Example info bytes
+		fuel_cell_msg.info[0] = 0xAA;
+		fuel_cell_msg.info[1] = 0x55;
+
+		// Publish the message
+		_fuel_cell_pub.publish(fuel_cell_msg);
+
+		// Add delay
+		px4_usleep(100000);
+
 	 /* fds initialized? */
 	//  if (_fd < 0) {
 	// 	 /* open fd */

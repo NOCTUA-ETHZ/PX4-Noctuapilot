@@ -9,6 +9,8 @@ px4_add_module(
 		ie_fuelcell_main.cpp
 	DEPENDS
 		px4_work_queue
+		systemlib
+		uORB
 	MODULE_CONFIG
 		module.yaml
 	)
