@@ -1,26 +1,6 @@
 module_name: IE FuelCell Driver
 serial_config:
-  - command: ie_fuelcell start ${SERIAL_DEV} ${BAUD_PARAM}
+  - command: ie_fuelcell start
     port_config_param:
       name: IEFC_SER_CFG
       group: IE_Fuelcell
-
-parameters:
-  - group: IE_Fuelcell
-    definitions:
-      IEFC_BAUD:
-        description:
-          short: Baud rate for fuel cell UART communication.
-          long: This parameter sets the baud rate for the IE FuelCell drivers UART interface.
-            Supported values are 2400, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600.
-        type: enum
-        default: 0
-        min: 0
-        max: 5
-        values:
-          0: 9600
-          1: 19200
-          2: 115200
-          3: 230400
-          4: 460800
-          5: 921600

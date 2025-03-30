@@ -22,9 +22,6 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
-#include <px4_platform_common/defines.h>
-#include <px4_platform_common/time.h>
-#include <drivers/drv_hrt.h>
 
  /**
   * @class IE_Fuelcell
@@ -41,7 +38,7 @@
 	  * @param device_name        Name of the serial port, e.g. "/dev/ttyS3"
 	  * @param bad_rate_parameter String representing the desired baud rate, e.g. "9600"
 	  */
-	 IE_Fuelcell(const char *device_name, const char *bad_rate_parameter);
+	 IE_Fuelcell();
 
 	 virtual ~IE_Fuelcell();
 
@@ -71,9 +68,6 @@
 	 uORB::Publication<fuel_cell_s> _fuel_cell_pub{ORB_ID(fuel_cell)};
 
 
-	 char _stored_device_name[256]{};            ///< The device name as passed in the constructor
-	 char _stored_baud_rate_parameter[256]{};    ///< The baud rate string as passed in the constructor
-
 	 bool _uart_initialized{false};
 	 int  _uart_fd{-1};
 
@@ -81,4 +75,5 @@
 	 int  _line_pos{0};
 
 	 fd_set _uart_fd_set;
+
  };
