@@ -1,27 +1,27 @@
 #include "IE_Fuelcell.hpp"
 #include <termios.h>
-#include <cstring>    // for memset, memcpy, etc.
-#include <cstdio>     // for printf/fprintf
-#include <cstdlib>    // for atof, atoi
-#include <sys/select.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <unistd.h>
-#include <px4_platform_common/defines.h>
-#include <px4_platform_common/time.h>
-#include <drivers/drv_hrt.h>
 
-// ... other includes as needed ...
 
 IE_Fuelcell::IE_Fuelcell(const char *device_name, const char *baud_rate_parameter) :
 	OutputModuleInterface(MODULE_NAME, px4::wq_configurations::hp_default)
 {
-	strncpy(_stored_device_name, device_name, sizeof(_stored_device_name) - 1);
-	_stored_device_name[sizeof(_stored_device_name) - 1] = '\0';
-	PX4_INFO("IE_Fuelcell created");
+	// Store device name
+	if (device_name) {
+		strncpy(_stored_device_name, device_name, sizeof(_stored_device_name) - 1);
+		_stored_device_name[sizeof(_stored_device_name) - 1] = '\0';
+	} else {
+		// Default if none provided
+		strncpy(_stored_device_name, "/dev/ttyS1", sizeof(_stored_device_name) - 1);
+	}
 
-	strncpy(_stored_baud_rate_parameter, baud_rate_parameter, sizeof(_stored_baud_rate_parameter) - 1);
-	_stored_baud_rate_parameter[sizeof(_stored_baud_rate_parameter) - 1] = '\0';
+	// Store baud rate string
+	if (bad_rate_parameter) {
+		strncpy(_stored_baud_rate_parameter, bad_rate_parameter, sizeof(_stored_baud_rate_parameter) - 1);
+		_stored_baud_rate_parameter[sizeof(_stored_baud_rate_parameter) - 1] = '\0';
+	} else {
+		// Default if none provided
+		strcpy(_stored_baud_rate_parameter, "9600");
+	}
 }
 
 IE_Fuelcell::~IE_Fuelcell()
@@ -32,10 +32,6 @@ IE_Fuelcell::~IE_Fuelcell()
 
 int IE_Fuelcell::initializeUART()
 {
-	// Optional: remove these prints for silence
-	//PX4_INFO("Initializing UART");
-
-	// Hard-coded for now
 	const char *UART_DEVICE = "/dev/ttyS1";
 	int32_t BAUDRATE = B9600;
 
@@ -61,7 +57,6 @@ int IE_Fuelcell::initializeUART()
 	cfsetispeed(&tty, BAUDRATE);
 	cfsetospeed(&tty, BAUDRATE);
 
-	// 8N1, no flow control, local, enable receiver
 	tty.c_cflag |= (CLOCAL | CREAD);
 	tty.c_cflag &= ~CSIZE;
 	tty.c_cflag |= CS8;
@@ -69,17 +64,12 @@ int IE_Fuelcell::initializeUART()
 	tty.c_cflag &= ~CSTOPB;
 	tty.c_cflag &= ~CRTSCTS;
 
-	// Raw input
 	tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-
-	// No software flow control
 	tty.c_iflag &= ~(IXON | IXOFF | IXANY);
 	tty.c_iflag &= ~(ICRNL | BRKINT | INLCR | IGNCR | INPCK | ISTRIP);
 
-	// Raw output
 	tty.c_oflag &= ~OPOST;
 
-	// VMIN=0 => return as soon as data is available
 	// VTIME=15 => up to 1.5 second read() block
 	tty.c_cc[VMIN]  = 0;
 	tty.c_cc[VTIME] = 15;
@@ -93,13 +83,11 @@ int IE_Fuelcell::initializeUART()
 	tcflush(fd, TCIOFLUSH);
 
 	_uart_fd = fd;
-	//PX4_INFO("UART successfully initialized on %s", UART_DEVICE);
 	return PX4_OK;
 }
 
 void IE_Fuelcell::Run()
 {
-	int iteration = 0;
 	if (should_exit()) {
 		ScheduleClear();
 		exit_and_cleanup();
@@ -118,10 +106,7 @@ void IE_Fuelcell::Run()
 
 	if (_uart_initialized) {
 		fuel_cell_s data;
-		int ret = readData(data);
-
-		if (ret < 0 && iteration > 20) {
-			iteration = 0;
+		if (readData(data) < 0) {
 			PX4_WARN("Read error => re-init port");
 			_uart_initialized = false;
 			if (_uart_fd >= 0) {
@@ -129,18 +114,14 @@ void IE_Fuelcell::Run()
 				_uart_fd = -1;
 			}
 		}
-		// If ret == 0 => either no data or successfully parsed => do nothing special
 	}
 
 	// Run at 5 Hz
 	ScheduleDelayed(200_ms);
-	iteration++;
 }
 
 int IE_Fuelcell::readData(fuel_cell_s &data)
 {
-	// Single pass of select => up to 100ms block
-	PX4_WARN("Reading data...");
 	fd_set readfds;
 	FD_ZERO(&readfds);
 	FD_SET(_uart_fd, &readfds);
@@ -179,23 +160,15 @@ int IE_Fuelcell::readData(fuel_cell_s &data)
 		char c = tmp_buf[i];
 
 		if (c == '\n' || c == '\r') {
-			// We have a full line
 			_line_accum[_line_pos] = '\0';
-			//PX4_INFO("Received line: %s", _line_accum);
-
-			// parseLine returns PX4_OK or PX4_ERROR
 			int parse_status = parseLine(_line_accum, data);
-			// Reset for next line
 			_line_pos = 0;
 
 			if (parse_status == PX4_ERROR) {
-				// Return negative => triggers re-init in this example
 				return -1;
 			}
 
-			// Successfully parsed or ignored `[ ... ]` => do not re-init
 		} else {
-			// Accumulate if there's space
 			if (_line_pos < (int)sizeof(_line_accum) - 1) {
 				_line_accum[_line_pos++] = c;
 			} else {
@@ -206,8 +179,6 @@ int IE_Fuelcell::readData(fuel_cell_s &data)
 		}
 	}
 
-	// If we get here, we processed everything we read. It's possible we didn't see a newline,
-	// in which case we just keep the partial line for next pass.
 	return 0;
 }
 
@@ -220,7 +191,6 @@ int IE_Fuelcell::parseLine(const char *line_buf, fuel_cell_s &data)
 		const char *endSq   = (startSq ? strchr(startSq, ']') : nullptr);
 
 		if (startSq || endSq) {
-			PX4_INFO("Discarding line in square brackets: '%s'", line_buf);
 			return PX4_OK; // Not an error
 		}
 	}
@@ -264,25 +234,11 @@ int IE_Fuelcell::parseLine(const char *line_buf, fuel_cell_s &data)
 			data.voltage      = atof(tokens[2]);
 			data.outputpower  = atof(tokens[3]);
 			data.spmpower     = atof(tokens[4]);
-			// tokens[5] is not used
 			data.battpower    = atof(tokens[6]);
 			data.psustate     = atoi(tokens[7]);
 			data.mainerror    = atoi(tokens[8]);
 			data.suberror     = atoi(tokens[9]);
-
-			PX4_INFO("Tank=%.2f, Reg=%.2f, V=%.2f, OutPow=%.2f, SPM=%.2f, Batt=%.2f, PSU=%ld, MainErr=%ld, SubErr=%ld",
-			         (double)data.tankpressure,
-			         (double)data.regpressure,
-			         (double)data.voltage,
-			         (double)data.outputpower,
-			         (double)data.spmpower,
-			         (double)data.battpower,
-			         (long)data.psustate,
-			         (long)data.mainerror,
-			         (long)data.suberror);
-			PX4_INFO("Parsed: '%s'", line_buf);
 			publishData(data);
-			PX4_INFO("Data published");
 			return PX4_OK;
 		}
 	}
@@ -307,13 +263,9 @@ int IE_Fuelcell::publishData(const fuel_cell_s &data)
 	fuel_cell_msg.suberror     = data.suberror;
 
 	_fuel_cell_pub.publish(fuel_cell_msg);
-	PX4_WARN("Published fuel cell data: %f", static_cast<double>(fuel_cell_msg.tankpressure));
 	return PX4_OK;
 }
 
-//------------------------------------------
-// Boilerplate for PX4 module
-//------------------------------------------
 
 int IE_Fuelcell::task_spawn(int argc, char *argv[])
 {
@@ -358,15 +310,13 @@ int IE_Fuelcell::print_usage(const char *reason)
 	}
 
 	PRINT_MODULE_DESCRIPTION(R"DESCR_STR(
-### Description
+		### Description
+		Driver communicating over UART with the Intelligent Energy FuelCell.
+		Configure which device to use and baud rate as follows:
 
-This driver communicates over UART with the Intelligent Energy FuelCell.
-
-The driver needs to be enabled using param IEFC_SER_CFG and the baud rate set with IEFC_BAUD.
-
-To start:
-  $ ie_fuelcell start <UART device> <baud rate>
-)DESCR_STR");
+		  $ ie_fuelcell start <device_path> <baud_string>
+		  E.g.: ie_fuelcell start /dev/ttyS1 9600
+		)DESCR_STR");
 
 	PRINT_MODULE_USAGE_NAME("ie_fuelcell", "driver");
 	PRINT_MODULE_USAGE_COMMAND("start");

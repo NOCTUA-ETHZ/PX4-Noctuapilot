@@ -1,5 +1,5 @@
 menuconfig DRIVERS_IE_FUELCELL
 	bool "ie_fuelcell"
-	default y
+	default n
 	---help---
 		Enable support for IE FC

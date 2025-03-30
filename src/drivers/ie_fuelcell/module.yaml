@@ -6,13 +6,13 @@ serial_config:
       group: IE_Fuelcell
 
 parameters:
-  - group: IE_Fuelcell Driver
+  - group: IE_Fuelcell
     definitions:
       IEFC_BAUD:
         description:
           short: Baud rate for fuel cell UART communication.
           long: This parameter sets the baud rate for the IE FuelCell drivers UART interface.
-            Supported values are 2400, 9600, 19200, 38400, 57600, 115200, 230400, and 460800.
+            Supported values are 2400, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600.
         type: enum
         default: 0
         min: 0
