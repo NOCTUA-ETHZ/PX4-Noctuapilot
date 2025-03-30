@@ -52,20 +52,26 @@
 
  private:
 
-	 uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
-	 uORB::Publication<fuel_cell_s> _fuel_cell_pub{ORB_ID(fuel_cell)};
-	 uORB::Publication<mavlink_log_s> _mavlink_log_pub{ORB_ID(mavlink_log)};
+	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
+	uORB::Publication<fuel_cell_s> _fuel_cell_pub{ORB_ID(fuel_cell)};
+	uORB::Publication<mavlink_log_s> _mavlink_log_pub{ORB_ID(mavlink_log)};
 
-	 char _stored_device_name[256]; // Adjust size as necessary
-	 char _stored_baud_rate_parameter[256]; // Adjust size as necessary
+	char _stored_device_name[256]; // Adjust size as necessary
+	char _stored_baud_rate_parameter[256]; // Adjust size as necessary
 
 
-	 // UART handling
-	 int initializeUART();
-	 bool _uart_initialized{false};
-	 int _uart_fd{0};
-	 fd_set _uart_fd_set;
-	 struct timeval _uart_fd_timeout;
+	// UART handling
+	int initializeUART();
+	bool _uart_initialized{false};
+	int _uart_fd{0};
+	fd_set _uart_fd_set;
+
+	// Partial line accumulation:
+	char _line_accum[256] {};
+	int  _line_pos {0};
+
+	int parseLine(const char *line_buf, fuel_cell_s &data);
+
 
 
  };
