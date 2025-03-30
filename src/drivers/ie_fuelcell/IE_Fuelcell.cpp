@@ -147,7 +147,7 @@ int IE_Fuelcell::readData(fuel_cell_s &data)
 
 	struct timeval tv;
 	tv.tv_sec  = 0;
-	tv.tv_usec = 100000; // 100ms
+	tv.tv_usec = 200000; // 100ms
 
 	int ret_select = select(_uart_fd + 1, &readfds, nullptr, nullptr, &tv);
 	if (ret_select < 0) {
@@ -181,7 +181,7 @@ int IE_Fuelcell::readData(fuel_cell_s &data)
 		if (c == '\n' || c == '\r') {
 			// We have a full line
 			_line_accum[_line_pos] = '\0';
-			PX4_INFO("Received line: %s", _line_accum);
+			//PX4_INFO("Received line: %s", _line_accum);
 
 			// parseLine returns PX4_OK or PX4_ERROR
 			int parse_status = parseLine(_line_accum, data);
@@ -219,7 +219,7 @@ int IE_Fuelcell::parseLine(const char *line_buf, fuel_cell_s &data)
 		const char *startSq = strchr(line_buf, '[');
 		const char *endSq   = (startSq ? strchr(startSq, ']') : nullptr);
 
-		if (startSq && endSq && (endSq > startSq)) {
+		if (startSq || endSq) {
 			PX4_INFO("Discarding line in square brackets: '%s'", line_buf);
 			return PX4_OK; // Not an error
 		}
@@ -255,7 +255,7 @@ int IE_Fuelcell::parseLine(const char *line_buf, fuel_cell_s &data)
 			}
 
 			if (token_count < 12) {
-				PX4_ERR("Incomplete data received");
+				PX4_ERR("Incomplete data received: %d tokens", token_count);
 				return PX4_ERROR;
 			}
 
