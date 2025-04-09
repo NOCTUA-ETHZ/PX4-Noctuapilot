@@ -2,7 +2,6 @@
 #define FUEL_CELL_HPP
 
 #include <uORB/topics/fuel_cell.h>
-#include <v2.0/common/mavlink.h>
 
 class MavlinkStreamFuelCell: public MavlinkStream
 {
@@ -34,11 +33,11 @@ public:
 
 private:
     // uORB::Subscription is used to subscribe to a single-instance topic
-    uORB::Subscription _fuel_cell_sub{ORB_ID::fuel_cell};
+    uORB::Subscription _fuel_cell_sub{ORB_ID(fuel_cell)};
 
     /* do not allow top copying this class */
-    MavlinkStreamFuelCell(MavlinkStreamFuelCell&);
-    MavlinkStreamFuelCell& operator = (const MavlinkStreamFuelCell&);
+    MavlinkStreamFuelCell(MavlinkStreamFuelCell &);
+    MavlinkStreamFuelCell& operator = (const MavlinkStreamFuelCell &);
 
 protected:
     explicit MavlinkStreamFuelCell(Mavlink *mavlink) : MavlinkStream(mavlink)
@@ -46,11 +45,11 @@ protected:
 
 	bool send() override
 	{
-		fuel_cell_s data;
+		struct fuel_cell_s data;
 
 		if (_fuel_cell_sub.update(&data))
 		{
-		    mavlink_fuel_cell_t msg{};
+		    mavlink_fuel_cell_t msg;
 
 		    msg.timestamp    = data.timestamp;
 		    msg.tankpressure = data.tankpressure;

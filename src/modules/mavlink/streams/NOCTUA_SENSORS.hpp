@@ -2,7 +2,6 @@
 #define NOCTUA_SENSORS_HPP
 
 #include <uORB/topics/noctua_sensors.h>
-#include <v2.0/common/mavlink.h>
 
 class MavlinkStreamNoctuaSensors : public MavlinkStream
 {
@@ -34,7 +33,7 @@ public:
 
 private:
     // uORB::Subscription is used to subscribe to a single-instance topic
-    uORB::Subscription _noctua_sensors_sub{ORB_ID::noctua_sensors};
+    uORB::Subscription _noctua_sensors_sub{ORB_ID(noctua_sensors)};
 
     /* do not allow top copying this class */
     MavlinkStreamNoctuaSensors(MavlinkStreamNoctuaSensors &);
