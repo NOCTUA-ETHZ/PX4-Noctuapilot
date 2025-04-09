@@ -59,7 +59,8 @@ protected:
 		    msg.spmpower     = data.spmpower;
 		    msg.battpower    = data.battpower;
 		    msg.psustate     = data.psustate;
-		    memcpy(msg.info, data.info, sizeof(msg.info)); // handle uint8[2]
+		    msg.mainerror   = data.mainerror;
+            msg.suberror    = data.suberror;
 
 		    mavlink_msg_fuel_cell_send_struct(_mavlink->get_channel(), &msg);
 		    return true;
