@@ -1,0 +1,6 @@
+module_name: IE FuelCell Driver
+serial_config:
+  - command: ie_fuelcell start
+    port_config_param:
+      name: IEFC_SER_CFG
+      group: IE_Fuelcell
