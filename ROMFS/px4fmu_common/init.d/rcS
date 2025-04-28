@@ -469,6 +469,11 @@ else
 		payload_deliverer start
 	fi
 
+	if param compare -s IEFC_SER_CFG 1
+	then
+		ie_fuelcell start
+	fi
+
 	#
 	# Optional board supplied extras: rc.board_extras
 	#
