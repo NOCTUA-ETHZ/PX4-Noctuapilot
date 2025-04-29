@@ -50,8 +50,6 @@ publications:
   - topic: /fmu/out/fuel_cell
     type: px4_msgs::msg::FuelCell
 
-  - topic: /fmu/out/noctua_sensors
-    type: px4_msgs::msg::NoctuaSensors
 
 subscriptions:
 
@@ -96,6 +94,3 @@ subscriptions:
 
   - topic: /fmu/in/fuel_cell
     type: px4_msgs::msg::FuelCell
-
-  - topic: /fmu/in/noctua_sensors
-    type: px4_msgs::msg::NoctuaSensors

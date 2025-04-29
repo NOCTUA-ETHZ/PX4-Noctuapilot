@@ -176,6 +176,7 @@ set(msg_files
 	SensorsStatus.msg
 	SensorsStatusImu.msg
 	SensorUwb.msg
+	SensorHydrogen.msg
 	SystemPower.msg
 	TakeoffStatus.msg
 	TaskStackInfo.msg
