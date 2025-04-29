@@ -240,10 +240,6 @@
 		  static_cast<double>(measured_temperature),
 		  static_cast<double>(hrt_elapsed_time(&measurement_time)) / 1e6);
 		  break;
-
-     case 2: // reset
-	 _state = sen0473_state::INIT;
-	 break;
      }
  }
 
@@ -269,7 +265,6 @@
      PRINT_MODULE_USAGE_PARAMS_I2C_ADDRESS(H2_I2C_ADDR_DEFAULT);
      PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
      PRINT_MODULE_USAGE_COMMAND_DESCR("values", "Print latest reading");
-     PRINT_MODULE_USAGE_COMMAND_DESCR("reset",  "Re-initialise sensor");
  }
 
  extern "C" __EXPORT int sen0473_main(int argc, char *argv[])
@@ -298,10 +293,6 @@
 	 return ThisDriver::module_custom_method(cli, iterator, false);
      }
 
-     if (!strcmp(verb, "reset")) {
-	 cli.custom1 = 2;
-	 return ThisDriver::module_custom_method(cli, iterator, false);
-     }
 
      ThisDriver::print_usage();
      return -1;
