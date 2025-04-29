@@ -130,7 +130,7 @@ void LoggedTopics::add_default_topics()
 	add_optional_topic("vtol_vehicle_status", 200);
 	add_topic("wind", 1000);
 	add_topic("sensor_hydrogen");
-	add_topic("fuel_cell", 500)
+	add_topic("fuel_cell", 500);
 
 
 	// multi topics
