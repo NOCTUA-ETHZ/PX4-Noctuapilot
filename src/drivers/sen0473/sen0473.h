@@ -114,7 +114,6 @@
      void         RunImpl();
 
      int          init() override;
-     int          probe() override;
      int          init_sensor();
      void         print_status() override;
 

@@ -142,16 +142,6 @@
      return write_frame(tx);
  }
 
- // ------------------------------------------------------------------------
- //  PX4 Driver API
- // ------------------------------------------------------------------------
-
- int SEN0473::probe()
- {
-   return PX4_OK;		//TEMP Workaround
- }
-
-
  int SEN0473::init()
  {
      if (I2C::init() != PX4_OK) {
@@ -197,7 +187,6 @@
 	 msg.timestamp_sample  = measurement_time;
 	 msg.hydrogen          = measured_hydrogen;
 	 msg.temperature       = measured_temperature;
-	 msg.device_id         = 0; // helper macro
 	 _sensor_hydrogen_pub.publish(msg);
      }
  }
@@ -206,7 +195,7 @@
  {
      switch (_state) {
      case sen0473_state::INIT:
-	 if (probe() == PX4_OK && init_sensor() == PX4_OK) {
+	 if (init_sensor() == PX4_OK) {
 	     _state = sen0473_state::MEASUREMENT;
 	 }
 	 break;
@@ -227,9 +216,8 @@
 	     PX4_WARN("sensor readout error, retrying …");
 	 }
 
-	 if (probe() == PX4_OK) {
-	     _state = sen0473_state::INIT;
-	 }
+	_state = sen0473_state::INIT;
+
 	 break;
      }
 
