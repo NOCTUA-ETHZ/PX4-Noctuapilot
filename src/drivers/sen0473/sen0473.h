@@ -92,14 +92,6 @@
      "Measurement"
  };
 
- // Sensor information stored for debug / uORB metadata
- struct sen_info {
-     uint32_t serial_number{0};
- };
-
- // ------------------------------------------------------------------------
- //  Driver class declaration
- // ------------------------------------------------------------------------
 
  class SEN0473 : public device::I2C,
 		 public ModuleParams,
@@ -136,7 +128,6 @@
      uint32_t     measurement_index{0};
 
      // State machine ----------------------------------------------------------
-     sen_info     _sen0473_info{};
      int          _state{INIT};
      int          _last_state{INIT};
      uint64_t     _time_in_state{hrt_absolute_time()};

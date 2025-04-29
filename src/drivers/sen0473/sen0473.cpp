@@ -36,8 +36,6 @@
  *
  * I2C driver for DFRobot Gravity SEN0473 hydrogen sensor.
  *
- *
- *
  * Author:  Nick Truttmann <ntruttmann@ethz.ch>
  */
 
@@ -46,14 +44,13 @@
  using namespace time_literals;
 
 
- static uint8_t gravity_checksum(const uint8_t *buf)
- {
-     uint8_t s = 0;
-     for (int i = 1; i < 8; ++i) {   // bytes[0] is always 0xFF
-	 s += buf[i];
-     }
-     return uint8_t(~s + 1);
- }
+ uint8_t gravity_checksum(const uint8_t *buf)
+{
+    uint16_t sum = 0;
+    for (int i = 1; i < 7; ++i) sum += buf[i];
+    return uint8_t(0x100 - (sum & 0xFF));     // identical result
+}
+
 
  SEN0473::SEN0473(const I2CSPIDriverConfig &config)
      : I2C(config), ModuleParams(nullptr), I2CSPIDriver(config)
@@ -79,10 +76,11 @@
      if (transfer(&reg, 1, frame, 9) != PX4_OK) {
 	 return false;
      }
-     return true; //for now
-     return (frame[0] == 0xFF && frame[1] == 0x01 &&
-	     frame[8] == gravity_checksum(frame));
+     return (frame[0] == 0xFF &&
+	frame[8] == gravity_checksum(frame));
  }
+
+
 
  bool SEN0473::query_all(float &ppm, float &tempC)
  {
@@ -123,12 +121,15 @@
      } else if (tempC > 40.f && tempC <= 60.f) {
 	 con_ppm = (con_ppm / (0.001f * tempC + 0.90f)) - (0.75f * tempC - 25.f);
      } else {
-	 con_ppm = 0.f;                       // outside characterised range
+     con_ppm = NAN;                       // outside characterized range
+     PX4_WARN("Temperature %.1f °C out of range", (double)tempC);
      }
 
-     if (con_ppm < 1e-5f) {                   // clamp tiny negatives
-	 con_ppm = 0.f;
-     }
+     if (con_ppm < 0) { // clamp negatives
+	con_ppm = NAN;
+	PX4_WARN("Temperature %.1f °C out of range", (double)tempC);
+
+}
 
      /* —— 6 / Return compensated reading —— */
      ppm = con_ppm;
@@ -213,7 +214,7 @@
      case sen0473_state::ERROR_READOUT:
      case sen0473_state::ERROR_GENERAL:
 	 if (_last_state != _state) {
-	     PX4_WARN("sensor readout error, retrying …");
+	    // PX4_WARN("sensor readout error, retrying …");
 	 }
 
 	_state = sen0473_state::INIT;
@@ -259,6 +260,7 @@
      PRINT_MODULE_DESCRIPTION(R"DESCR_STR(
  ### Description
  Driver for the DFRobot Gravity SEN0473 hydrogen sensor (I²C).
+ Make sure to preheat the sensor before usage, at least 5min or 24h after extended storage.
  )DESCR_STR");
 
      PRINT_MODULE_USAGE_NAME("sen0473", "driver");
