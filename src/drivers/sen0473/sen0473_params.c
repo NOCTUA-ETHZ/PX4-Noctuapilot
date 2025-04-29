@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * SHT3x temperature and hygrometer
+ * DFRobot Gravity SEN0473 hydrogen sensor
  *
  * @reboot_required true
  * @group Sensors
