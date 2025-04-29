@@ -469,9 +469,16 @@ else
 		payload_deliverer start
 	fi
 
+	# Check for IE Fuel Cell
 	if param compare -s IEFC_SER_CFG 1
 	then
 		ie_fuelcell start
+	fi
+
+	# DFRobot Gravity H2 Sensor
+	if param compare -s SENS_EN_SEN0473 1
+	then
+		sen0473 start -X -b 2
 	fi
 
 	#
