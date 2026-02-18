@@ -120,8 +120,7 @@
 #include "streams/VFR_HUD.hpp"
 #include "streams/VIBRATION.hpp"
 #include "streams/WIND_COV.hpp"
-#include "streams/NOCTUA_SENSORS.hpp"
-#include "streams/FUEL_CELL.hpp"
+//#include "streams/FUEL_CELL.hpp"
 
 #if !defined(CONSTRAINED_FLASH)
 # include "streams/ADSB_VEHICLE.hpp"
@@ -485,9 +484,6 @@ static const StreamListItem streams_list[] = {
 #if defined(UAVIONIX_ADSB_OUT_DYNAMIC_HPP)
 	create_stream_list_item<MavlinkStreamUavionixADSBOutDynamic>(),
 #endif // UAVIONIX_ADSB_OUT_DYNAMIC_HPP
-#if defined(NOCTUA_SENSORS_HPP)
-	create_stream_list_item<MavlinkStreamNoctuaSensors>(),
-#endif // NOCTUA_SENSORS_HPP
 #if defined(FUEL_CELL_HPP)
 	create_stream_list_item<MavlinkStreamFuelCell>()
 #endif // FUEL_CELL_HPP

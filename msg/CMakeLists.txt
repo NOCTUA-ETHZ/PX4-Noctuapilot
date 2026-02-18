@@ -129,7 +129,6 @@ set(msg_files
 	MountOrientation.msg
 	ModeCompleted.msg
 	NavigatorMissionItem.msg
-	NoctuaSensors.msg
 	NormalizedUnsignedSetpoint.msg
 	NpfgStatus.msg
 	ObstacleDistance.msg
@@ -177,6 +176,7 @@ set(msg_files
 	SensorsStatus.msg
 	SensorsStatusImu.msg
 	SensorUwb.msg
+	SensorHydrogen.msg
 	SystemPower.msg
 	TakeoffStatus.msg
 	TaskStackInfo.msg

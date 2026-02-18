@@ -1,0 +1,5 @@
+menuconfig DRIVERS_SEN0473
+	bool "Gravity sen0473 H2 Sensor"
+	default y
+	---help---
+		Enable support Gravity sen0473 Hydrogen sensor
