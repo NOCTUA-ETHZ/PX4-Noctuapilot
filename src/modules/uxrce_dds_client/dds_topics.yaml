@@ -123,6 +123,17 @@ publications:
     type: px4_msgs::msg::InputRc
     rate_limit: 10.
 
+  - topic: /fmu/out/landing_target_pose
+    type: px4_msgs::msg::LandingTargetPose
+    rate_limit: 50.
+
+  - topic: /fmu/out/vte_orientation
+    type: px4_msgs::msg::VteOrientation
+    rate_limit: 50.
+
+  - topic: /fmu/out/vehicle_local_position
+    type: px4_msgs::msg::VehicleLocalPosition
+
 # Create uORB::Publication
 subscriptions:
   - topic: /fmu/in/register_ext_component_request
