@@ -45,21 +45,19 @@ inline bool decode(uint32_t id, bool extended, bool remote, bool error, const ui
 	return true;
 }
 
-// A repeated counter must not keep old telemetry alive. Accept jumps and
-// wraparound: frames may be lost, and the FCPM may restart independently.
+// Link freshness comes from frame reception. The manual does not promise an
+// autonomously advancing TX counter; on hardware it may remain unchanged.
+// Track repeated counters for diagnostics without discarding their payloads.
 class Freshness
 {
 public:
-	bool accept(uint8_t counter, uint64_t now)
+	bool observe(uint8_t counter, uint64_t now)
 	{
-		if (_received && counter == _counter) {
-			return false;
-		}
-
+		const bool changed = !_received || counter != _counter;
 		_received = true;
 		_counter = counter;
 		_last_update = now;
-		return true;
+		return changed;
 	}
 
 	bool fresh(uint64_t now, uint64_t timeout) const

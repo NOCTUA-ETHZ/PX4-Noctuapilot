@@ -217,24 +217,47 @@ static void test_bridge()
 		test_now += 100000;
 		node.receive(1, 0); // counter wrap
 		assert(test_last.received_frames == 2);
-		const uint64_t accepted = test_now;
 		const unsigned publications = test_publications;
 		test_now += 499999;
-		node.receive(1, 0); // duplicate does not refresh timestamp
+		node.receive(1, 0); // even an identical frame proves link activity
 		bridge.update();
-		assert(test_publications == publications && test_last.timestamp_sample == accepted);
+		assert(test_publications == publications + 1 && test_last.timestamp_sample == test_now);
+		assert(test_last.received_frames == 3 && test_last.duplicate_frames == 1);
+		assert(test_last.connected);
+		assert(test_last.raw_data[0] == 0x20);
+		assert(memcmp(test_last.raw_data + 1, Golden + 1, 7) == 0);
+
+		// Same counter with a changed measurement must update that measurement.
+		test_now += 100000;
+		uavcan::CanFrame changed(uavcan::CanFrame::FlagEFF | 0x400, Golden, 8);
+		changed.data[0] = 0x20;
+		changed.data[6] += 10; // battery power -50 W -> +50 W
+		node.driver.interfaces[1].input.push_back({changed, 0});
+		assert(node.spinOnce() >= 0);
+		close_to(test_last.battery_power_w, 50.f);
+		assert(test_last.received_frames == 4 && test_last.duplicate_frames == 2);
+		assert(memcmp(test_last.raw_data, changed.data, 8) == 0);
+		const uint64_t accepted = test_now;
+
+		// Actual silence times out; rejected input must not keep the link alive.
+		test_now += 499999;
+		node.receive(0, 1);
+		node.receive(1, 1, 0x400);
+		bridge.update();
+		assert(test_last.connected);
 		++test_now;
 		bridge.update();
 		assert(!test_last.connected && std::isnan(test_last.battery_voltage_v));
-		assert(test_last.timestamp_sample == accepted && test_last.duplicate_frames == 1);
-		assert(test_publications == publications + 1);
+		assert(test_last.timestamp_sample == accepted && test_last.duplicate_frames == 2);
+		assert(test_publications == publications + 3);
 		bridge.update();
-		assert(test_publications == publications + 1); // one timeout notification
+		assert(test_publications == publications + 3); // one timeout notification
 		node.receive(1, 0);
-		assert(!test_last.connected); // stuck counter cannot revive stale data
-		node.receive(1, 7); // recovery, gaps are allowed
-		assert(test_last.connected && test_last.received_frames == 3);
-		assert(test_last.duplicate_frames == 2);
+		assert(test_last.connected); // reconnect can have the same counter
+		close_to(test_last.battery_power_w, -50.f);
+		node.receive(1, 7); // gaps are allowed
+		assert(test_last.connected && test_last.received_frames == 6);
+		assert(test_last.duplicate_frames == 3);
 		assert(node.driver.interfaces[0].transmissions == 0 && node.driver.interfaces[1].transmissions == 0);
 		bridge.print_status();
 	}

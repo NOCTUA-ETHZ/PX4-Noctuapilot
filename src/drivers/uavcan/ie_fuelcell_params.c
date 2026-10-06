@@ -34,9 +34,9 @@ PARAM_DEFINE_INT32(IEFC_CAN_IFACE, 1);
 /**
  * IE-SOAR CAN telemetry timeout
  *
- * Telemetry is marked disconnected if no frame with a changed cyclic
- * counter has been accepted within this interval. Invalid frames and
- * repeated counters do not refresh the timeout. No flight action is taken.
+ * Telemetry is marked disconnected if no matching valid CAN frame has
+ * arrived within this interval. Repeated counters are diagnostic only
+ * and do refresh the timeout. No flight action is taken.
  *
  * @unit ms
  * @min 200

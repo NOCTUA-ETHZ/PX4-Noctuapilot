@@ -54,7 +54,7 @@ listener ie_fuelcell_can_status 10
 `IEFC_CAN_IFACE=1` selects CAN1 and `=2` selects CAN2 on Pixhawk 6C. Parameters
 are read once during initialization and require a reboot to change.
 
-Expect changing counters and approximately 10 Hz updates. Compare pressure,
+Expect increasing received-frame counts and approximately 10 Hz updates. Compare pressure,
 voltage, power, state and error values against the IE diagnostic tool. Then
 disconnect the telemetry cable: `connected` must become false within the
 configured timeout plus scheduling delay. Reconnect and confirm recovery.
@@ -83,14 +83,25 @@ and UART subcodes. A separate topic prevents silently changing units for
 existing consumers. There is no new MAVLink or DDS mapping in this version;
 inspect through the NSH listener or ULog.
 
-Only frames with a changed cyclic counter update measurements. Counter jumps
-and wraparound are allowed. Duplicate frames do not refresh freshness. At
+Every matching eight-byte extended frame updates measurements and reception
+freshness, even if its cyclic counter is unchanged. Hardware observations show
+an apparently fixed counter; the manual does not guarantee that it advances
+autonomously. `duplicate_frames` counts repeated counters for diagnostics;
+it does not imply that the payload is identical. Counter jumps and wraparound
+are also allowed. At
 startup and after timeout, `connected=false` and all floating-point
 measurements are NaN. `timestamp_sample` is the last accepted reception time,
 or zero before the first frame. Raw state/error fields retain their last
 values and must only be used when `connected=true`. A timestamp is published
 once on timeout; downstream consumers must also monitor publication age if
-the entire UAVCAN module stops.
+the entire UAVCAN module stops. `connected` indicates recent matching CAN
+traffic, not proof that the decoded measurements or FCPM state are correct.
+
+`raw_data` retains the last eight payload bytes in wire order. `uavcan status`
+also prints these as hexadecimal bytes. Capture several samples alongside
+the fuel-cell's own diagnostics to verify the bit layout. A powered FCPM can
+transmit telemetry while its stack is off or faulted; receive-only telemetry
+does not require hydrogen consumption or stack power generation.
 
 ## Scope
 

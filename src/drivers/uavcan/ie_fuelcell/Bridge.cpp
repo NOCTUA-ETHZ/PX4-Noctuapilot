@@ -9,6 +9,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 
 IeFuelcellCanBridge::~IeFuelcellCanBridge()
 {
@@ -73,9 +74,8 @@ void IeFuelcellCanBridge::handleRxFrame(const uavcan::CanRxFrame &frame, uavcan:
 	// some boards. Use HRT here rather than copying frame.ts_monotonic.
 	const uint64_t now = hrt_absolute_time();
 
-	if (!_freshness.accept(decoded.counter, now)) {
+	if (!_freshness.observe(decoded.counter, now)) {
 		++_status.duplicate_frames;
-		return;
 	}
 
 	_status.timestamp = now;
@@ -89,6 +89,7 @@ void IeFuelcellCanBridge::handleRxFrame(const uavcan::CanRxFrame &frame, uavcan:
 	_status.counter = decoded.counter;
 	_status.state = decoded.state;
 	_status.error_code = decoded.error;
+	memcpy(_status.raw_data, frame.data, sizeof(_status.raw_data));
 	++_status.received_frames;
 	_status_pub.publish(_status);
 }
@@ -125,12 +126,19 @@ void IeFuelcellCanBridge::print_status() const
 
 	printf("IE fuel cell CAN%u: %s, format 2, receive only\n", unsigned(_status.interface),
 	       _status.connected ? "connected" : "waiting/stale");
-	printf("  accepted: %lu, duplicate: %lu, invalid: %lu\n", (unsigned long)_status.received_frames,
+	printf("  received: %lu, repeated counter: %lu, invalid: %lu\n", (unsigned long)_status.received_frames,
 	       (unsigned long)_status.duplicate_frames, (unsigned long)_invalid_frames);
 
 	if (_status.timestamp_sample != 0) {
 		printf("  sample age: %llu ms, counter: %u, state: %u, raw error: %u\n",
 		       (unsigned long long)((hrt_absolute_time() - _status.timestamp_sample) / 1000),
 		       unsigned(_status.counter), unsigned(_status.state), unsigned(_status.error_code));
+		printf("  RX extended 0x400 DLC 8:");
+
+		for (uint8_t byte : _status.raw_data) {
+			printf(" %02x", unsigned(byte));
+		}
+
+		printf("\n");
 	}
 }

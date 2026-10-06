@@ -25,7 +25,11 @@ with tempfile.TemporaryDirectory(prefix="ie-fuelcell-test-") as work:
     for line in (repo / "msg/IeFuelcellCanStatus.msg").read_text().splitlines():
         parts = line.split("#", 1)[0].split()
         if parts:
-            fields.append(f"{types[parts[0]]} {parts[1]};")
+            field_type, name = parts
+            if "[" in field_type:
+                field_type, size = field_type.rstrip("]").split("[")
+                name += f"[{int(size)}]"
+            fields.append(f"{types[field_type]} {name};")
     stubs = {
         "uORB/topics/ie_fuelcell_can_status.h":
             "#pragma once\n#include <cstdint>\nstruct ie_fuelcell_can_status_s {\n"
