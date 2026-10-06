@@ -582,6 +582,10 @@ UavcanNode::init(uavcan::NodeID node_id, UAVCAN_DRIVER::BusEvent &bus_events)
 		}
 	}
 
+#if defined(CONFIG_UAVCAN_IE_FUELCELL)
+	_ie_fuelcell_can.init();
+#endif
+
 	// Start the Node
 	return _node.start();
 }
@@ -703,6 +707,10 @@ UavcanNode::Run()
 	}
 
 	_node.spinOnce(); // expected to be non-blocking
+
+#if defined(CONFIG_UAVCAN_IE_FUELCELL)
+	_ie_fuelcell_can.update();
+#endif
 
 	// check for parameter updates
 	if (_parameter_update_sub.updated()) {
@@ -979,6 +987,10 @@ void
 UavcanNode::print_info()
 {
 	(void)pthread_mutex_lock(&_node_mutex);
+
+#if defined(CONFIG_UAVCAN_IE_FUELCELL)
+	_ie_fuelcell_can.print_status();
+#endif
 
 	// Memory status
 	printf("Pool allocator status:\n");
