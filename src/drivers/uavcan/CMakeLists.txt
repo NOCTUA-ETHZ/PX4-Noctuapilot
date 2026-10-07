@@ -194,3 +194,7 @@ px4_add_module(
 		# within libuavcan
 		uavcan
 	)
+
+if(CONFIG_UAVCAN_FUEL_CELL)
+	target_sources(drivers__uavcan PRIVATE fuel_cell/Bridge.cpp)
+endif()

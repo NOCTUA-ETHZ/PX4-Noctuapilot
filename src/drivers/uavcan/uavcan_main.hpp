@@ -59,6 +59,10 @@
 #include "uavcan_driver.hpp"
 #include "uavcan_servers.hpp"
 
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+#include "fuel_cell/Bridge.hpp"
+#endif
+
 #include <lib/drivers/device/Device.hpp>
 #include <lib/mixer_module/mixer_module.hpp>
 #include <lib/perf/perf_counter.h>
@@ -223,6 +227,10 @@ private:
 
 	bool                    _node_init{false};
 	uavcan::Node<>			_node;				///< library instance
+
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+	FuelCellCanBridge _fuel_cell_can{_node};
+#endif
 	pthread_mutex_t			_node_mutex;
 
 	UavcanArmingStatus		_arming_status_controller;
