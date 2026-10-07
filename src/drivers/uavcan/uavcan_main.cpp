@@ -582,8 +582,8 @@ UavcanNode::init(uavcan::NodeID node_id, UAVCAN_DRIVER::BusEvent &bus_events)
 		}
 	}
 
-#if defined(CONFIG_UAVCAN_IE_FUELCELL)
-	_ie_fuelcell_can.init();
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+	_fuel_cell_can.init();
 #endif
 
 	// Start the Node
@@ -708,8 +708,8 @@ UavcanNode::Run()
 
 	_node.spinOnce(); // expected to be non-blocking
 
-#if defined(CONFIG_UAVCAN_IE_FUELCELL)
-	_ie_fuelcell_can.update();
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+	_fuel_cell_can.update();
 #endif
 
 	// check for parameter updates
@@ -988,8 +988,8 @@ UavcanNode::print_info()
 {
 	(void)pthread_mutex_lock(&_node_mutex);
 
-#if defined(CONFIG_UAVCAN_IE_FUELCELL)
-	_ie_fuelcell_can.print_status();
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+	_fuel_cell_can.print_status();
 #endif
 
 	// Memory status

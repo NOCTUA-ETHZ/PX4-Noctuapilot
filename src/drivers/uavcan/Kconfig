@@ -5,13 +5,13 @@ menuconfig DRIVERS_UAVCAN
 		Enable support for uavcan
 
 
-config UAVCAN_IE_FUELCELL
+config UAVCAN_FUEL_CELL
 	bool "IE-SOAR S800 raw CAN telemetry"
-	depends on DRIVERS_UAVCAN
+	depends on DRIVERS_UAVCAN && DRIVERS_FUEL_CELL
 	default n
 	help
 		Receive IE-SOAR S800 customer CAN format 2 using the UAVCAN
-		driver's raw frame listener. Runtime enable is IEFC_CAN_EN.
+		driver's raw frame listener. Select CAN1 or CAN2 with FC_INTERFACE.
 
 menuconfig BOARD_UAVCAN_INTERFACES
 depends on DRIVERS_UAVCAN || DRIVERS_UAVCANNODE

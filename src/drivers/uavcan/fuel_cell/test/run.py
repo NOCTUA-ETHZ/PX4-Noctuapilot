@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix="ie-fuelcell-test-") as work:
     fields = []
     types = {"uint64": "uint64_t", "uint32": "uint32_t", "uint8": "uint8_t",
              "float32": "float", "bool": "bool"}
-    for line in (repo / "msg/IeFuelcellCanStatus.msg").read_text().splitlines():
+    for line in (repo / "msg/FuelCellCan.msg").read_text().splitlines():
         parts = line.split("#", 1)[0].split()
         if parts:
             field_type, name = parts
@@ -31,13 +31,13 @@ with tempfile.TemporaryDirectory(prefix="ie-fuelcell-test-") as work:
                 name += f"[{int(size)}]"
             fields.append(f"{types[field_type]} {name};")
     stubs = {
-        "uORB/topics/ie_fuelcell_can_status.h":
-            "#pragma once\n#include <cstdint>\nstruct ie_fuelcell_can_status_s {\n"
+        "uORB/topics/fuel_cell_can.h":
+            "#pragma once\n#include <cstdint>\nstruct fuel_cell_can_s {\n"
             + "\n".join(fields) + "\n};\n",
         "uORB/Publication.hpp": """#pragma once
-#include <uORB/topics/ie_fuelcell_can_status.h>
+#include <uORB/topics/fuel_cell_can.h>
 extern unsigned test_publications;
-extern ie_fuelcell_can_status_s test_last;
+extern fuel_cell_can_s test_last;
 #define ORB_ID(name) 0
 namespace uORB {
 template<class T> class Publication {

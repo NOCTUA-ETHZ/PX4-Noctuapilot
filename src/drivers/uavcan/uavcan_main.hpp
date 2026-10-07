@@ -59,8 +59,8 @@
 #include "uavcan_driver.hpp"
 #include "uavcan_servers.hpp"
 
-#if defined(CONFIG_UAVCAN_IE_FUELCELL)
-#include "ie_fuelcell/Bridge.hpp"
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+#include "fuel_cell/Bridge.hpp"
 #endif
 
 #include <lib/drivers/device/Device.hpp>
@@ -228,8 +228,8 @@ private:
 	bool                    _node_init{false};
 	uavcan::Node<>			_node;				///< library instance
 
-#if defined(CONFIG_UAVCAN_IE_FUELCELL)
-	IeFuelcellCanBridge _ie_fuelcell_can{_node};
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+	FuelCellCanBridge _fuel_cell_can{_node};
 #endif
 	pthread_mutex_t			_node_mutex;
 

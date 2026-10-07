@@ -1,0 +1,10 @@
+module_name: Fuel cell
+serial_config:
+  - command: |
+      if param compare FC_INTERFACE 1
+      then
+          fuel_cell start -d ${SERIAL_DEV}
+      fi
+    port_config_param:
+      name: FC_SER_CFG
+      group: Fuel Cell

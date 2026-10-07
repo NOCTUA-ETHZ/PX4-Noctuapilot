@@ -195,6 +195,6 @@ px4_add_module(
 		uavcan
 	)
 
-if(CONFIG_UAVCAN_IE_FUELCELL)
-	target_sources(drivers__uavcan PRIVATE ie_fuelcell/Bridge.cpp)
+if(CONFIG_UAVCAN_FUEL_CELL)
+	target_sources(drivers__uavcan PRIVATE fuel_cell/Bridge.cpp)
 endif()

@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace ie_fuelcell
+namespace fuelcell_can
 {
 
 // IE-SOAR S800 User Manual V1.2, section 9.2.2, customer CAN format 2.
@@ -73,4 +73,4 @@ private:
 	uint64_t _last_update{0};
 };
 
-} // namespace ie_fuelcell
+} // namespace fuelcell_can

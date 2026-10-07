@@ -14,20 +14,19 @@ int32_t test_enabled = 1;
 int32_t test_interface = 2;
 int32_t test_timeout = 500;
 unsigned test_publications = 0;
-ie_fuelcell_can_status_s test_last{};
+fuel_cell_can_s test_last{};
 
 uint64_t hrt_absolute_time() { return test_now; }
 int param_find(const char *name)
 {
-	if (!strcmp(name, "IEFC_CAN_EN")) { return 0; }
-	if (!strcmp(name, "IEFC_CAN_IFACE")) { return 1; }
-	if (!strcmp(name, "IEFC_CAN_TOUT")) { return 2; }
+	if (!strcmp(name, "FC_INTERFACE")) { return 0; }
+	if (!strcmp(name, "FC_TIMEOUT")) { return 2; }
 	assert(false);
 	return -1;
 }
 int param_get(int id, void *value)
 {
-	*static_cast<int32_t *>(value) = id == 0 ? test_enabled : id == 1 ? test_interface : test_timeout;
+	*static_cast<int32_t *>(value) = id == 0 ? (test_enabled ? test_interface + 1 : 0) : test_timeout;
 	return 0;
 }
 
@@ -40,8 +39,8 @@ static void close_to(float actual, float expected)
 
 static void test_protocol()
 {
-	ie_fuelcell::Status status{};
-	assert(ie_fuelcell::decode(0x400, true, false, false, Golden, 8, status));
+	fuelcell_can::Status status{};
+	assert(fuelcell_can::decode(0x400, true, false, false, Golden, 8, status));
 	close_to(status.tank_pressure_bar, 300.f);
 	close_to(status.battery_voltage_v, 49.7f);
 	close_to(status.output_power_w, 700.f);
@@ -52,7 +51,7 @@ static void test_protocol()
 	// Actual MCU v3.63 capture. Voltage agrees with the independently logged
 	// ~46.2 V battery; the old LSB-first decoder incorrectly produced 0.7 V.
 	const uint8_t captured[8] = {0x80, 0x00, 0x1c, 0xe0, 0x00, 0x01, 0x3e, 0x60};
-	assert(ie_fuelcell::decode(0x400, true, false, false, captured, 8, status));
+	assert(fuelcell_can::decode(0x400, true, false, false, captured, 8, status));
 	close_to(status.battery_voltage_v, 46.2f);
 	close_to(status.tank_pressure_bar, 0.f);
 	close_to(status.output_power_w, 0.f);
@@ -70,7 +69,7 @@ static void test_protocol()
 	for (unsigned bit = 0; bit < 64; ++bit) {
 		uint8_t bytes[8]{};
 		bytes[bit / 8] = 1u << (7 - bit % 8);
-		assert(ie_fuelcell::decode(0x400, true, false, false, bytes, 8, status));
+		assert(fuelcell_can::decode(0x400, true, false, false, bytes, 8, status));
 		const float fields[] = {status.tank_pressure_bar, status.battery_voltage_v, status.output_power_w,
 					status.stack_power_w, status.battery_power_w};
 
@@ -91,7 +90,7 @@ static void test_protocol()
 
 	uint8_t maximum[8];
 	memset(maximum, 0xff, sizeof(maximum));
-	assert(ie_fuelcell::decode(0x400, true, false, false, maximum, 8, status));
+	assert(fuelcell_can::decode(0x400, true, false, false, maximum, 8, status));
 	close_to(status.tank_pressure_bar, 511.5f);
 	close_to(status.battery_voltage_v, 102.3f);
 	close_to(status.output_power_w, 10230.f);
@@ -104,19 +103,19 @@ static void test_protocol()
 		uint8_t bytes[8]{};
 		bytes[6] = raw >> 2;
 		bytes[7] = (raw & 3u) << 6;
-		assert(ie_fuelcell::decode(0x400, true, false, false, bytes, 8, status));
+		assert(fuelcell_can::decode(0x400, true, false, false, bytes, 8, status));
 		close_to(status.battery_power_w, int(raw) * 10.f - 5000.f);
 	}
 
-	assert(!ie_fuelcell::decode(0x401, true, false, false, Golden, 8, status));
-	assert(!ie_fuelcell::decode(0x400, false, false, false, Golden, 8, status));
-	assert(!ie_fuelcell::decode(0x400, true, true, false, Golden, 8, status));
-	assert(!ie_fuelcell::decode(0x400, true, false, true, Golden, 8, status));
-	assert(!ie_fuelcell::decode(0x400, true, false, false, nullptr, 8, status));
+	assert(!fuelcell_can::decode(0x401, true, false, false, Golden, 8, status));
+	assert(!fuelcell_can::decode(0x400, false, false, false, Golden, 8, status));
+	assert(!fuelcell_can::decode(0x400, true, true, false, Golden, 8, status));
+	assert(!fuelcell_can::decode(0x400, true, false, true, Golden, 8, status));
+	assert(!fuelcell_can::decode(0x400, true, false, false, nullptr, 8, status));
 
 	for (unsigned length = 0; length < 16; ++length) {
 		if (length != 8) {
-			assert(!ie_fuelcell::decode(0x400, true, false, false, Golden, length, status));
+			assert(!fuelcell_can::decode(0x400, true, false, false, Golden, length, status));
 		}
 	}
 }
@@ -197,7 +196,7 @@ static void test_bridge()
 {
 	Node node;
 	{
-		IeFuelcellCanBridge bridge(node);
+		FuelCellCanBridge bridge(node);
 		bridge.init();
 		assert(node.getDispatcher().getRxFrameListener() == &bridge);
 		assert(!test_last.connected && test_last.timestamp_sample == 0);
@@ -280,30 +279,36 @@ static void test_bridge()
 	// Disabled/invalid configuration must leave the CAN dispatcher untouched.
 	test_enabled = 0;
 	{
-		IeFuelcellCanBridge bridge(node);
+		FuelCellCanBridge bridge(node);
 		bridge.init();
 		assert(node.getDispatcher().getRxFrameListener() == nullptr);
 	}
 	test_enabled = 1;
+	test_interface = 0; // FC_INTERFACE=1 (UART) must not install a CAN listener
+	{
+		FuelCellCanBridge bridge(node);
+		bridge.init();
+		assert(node.getDispatcher().getRxFrameListener() == nullptr);
+	}
 	test_interface = 3;
 	{
-		IeFuelcellCanBridge bridge(node);
+		FuelCellCanBridge bridge(node);
 		bridge.init();
 		assert(node.getDispatcher().getRxFrameListener() == nullptr);
 	}
 	test_interface = 1;
 	test_timeout = 0;
 	{
-		IeFuelcellCanBridge bridge(node);
+		FuelCellCanBridge bridge(node);
 		bridge.init();
 		assert(node.getDispatcher().getRxFrameListener() == nullptr);
 	}
 	test_timeout = 500;
 	{
-		IeFuelcellCanBridge first(node);
+		FuelCellCanBridge first(node);
 		first.init();
 		{
-			IeFuelcellCanBridge second(node);
+			FuelCellCanBridge second(node);
 			second.init();
 			assert(node.getDispatcher().getRxFrameListener() == &first);
 		}

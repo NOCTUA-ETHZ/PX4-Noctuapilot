@@ -11,36 +11,35 @@
 #include <cstdio>
 #include <cstring>
 
-IeFuelcellCanBridge::~IeFuelcellCanBridge()
+FuelCellCanBridge::~FuelCellCanBridge()
 {
 	if (_node.getDispatcher().getRxFrameListener() == this) {
 		_node.removeRxFrameListener();
 	}
 }
 
-void IeFuelcellCanBridge::init()
+void FuelCellCanBridge::init()
 {
 	int32_t enabled = 0;
-	param_get(param_find("IEFC_CAN_EN"), &enabled);
+	param_get(param_find("FC_INTERFACE"), &enabled);
 
-	if (enabled == 0) {
+	if (enabled != 2 && enabled != 3) {
 		return;
 	}
 
-	int32_t interface = 1;
-	int32_t timeout_ms = 500;
-	param_get(param_find("IEFC_CAN_IFACE"), &interface);
-	param_get(param_find("IEFC_CAN_TOUT"), &timeout_ms);
+	int32_t interface = enabled - 1;
+	int32_t timeout_ms = 2000;
+	param_get(param_find("FC_TIMEOUT"), &timeout_ms);
 	const unsigned interfaces = _node.getDispatcher().getCanIOManager().getCanDriver().getNumIfaces();
 
 	if (interface < 1 || static_cast<unsigned>(interface) > interfaces || timeout_ms < 200 || timeout_ms > 5000) {
-		PX4_ERR("IE fuel cell: invalid CAN interface or timeout");
+		PX4_ERR("Fuel cell: invalid CAN interface or timeout");
 		return;
 	}
 
 	// libuavcan exposes one listener slot. Never silently replace its owner.
 	if (_node.getDispatcher().getRxFrameListener() != nullptr) {
-		PX4_ERR("IE fuel cell: CAN frame listener already in use");
+		PX4_ERR("Fuel cell: CAN frame listener already in use");
 		return;
 	}
 
@@ -49,22 +48,22 @@ void IeFuelcellCanBridge::init()
 	_node.installRxFrameListener(this);
 	_enabled = true;
 	invalidate(hrt_absolute_time());
-	PX4_INFO("IE fuel cell: CAN%d format 2 telemetry enabled", static_cast<int>(interface));
+	PX4_INFO("Fuel cell: CAN%d format 2 telemetry enabled", static_cast<int>(interface));
 }
 
-void IeFuelcellCanBridge::handleRxFrame(const uavcan::CanRxFrame &frame, uavcan::CanIOFlags flags)
+void FuelCellCanBridge::handleRxFrame(const uavcan::CanRxFrame &frame, uavcan::CanIOFlags flags)
 {
 	if (!_enabled || (flags & uavcan::CanIOFlagLoopback) || frame.iface_index != _status.interface - 1) {
 		return;
 	}
 
-	if ((frame.id & uavcan::CanFrame::MaskExtID) != ie_fuelcell::StatusId) {
+	if ((frame.id & uavcan::CanFrame::MaskExtID) != fuelcell_can::StatusId) {
 		return;
 	}
 
-	ie_fuelcell::Status decoded{};
+	fuelcell_can::Status decoded{};
 
-	if (!ie_fuelcell::decode(frame.id & uavcan::CanFrame::MaskExtID, frame.isExtended(),
+	if (!fuelcell_can::decode(frame.id & uavcan::CanFrame::MaskExtID, frame.isExtended(),
 				frame.isRemoteTransmissionRequest(), frame.isErrorFrame(), frame.data, frame.dlc, decoded)) {
 		++_invalid_frames;
 		return;
@@ -94,7 +93,7 @@ void IeFuelcellCanBridge::handleRxFrame(const uavcan::CanRxFrame &frame, uavcan:
 	_status_pub.publish(_status);
 }
 
-void IeFuelcellCanBridge::invalidate(uint64_t now)
+void FuelCellCanBridge::invalidate(uint64_t now)
 {
 	_status.timestamp = now;
 	_status.connected = false;
@@ -106,7 +105,7 @@ void IeFuelcellCanBridge::invalidate(uint64_t now)
 	_status_pub.publish(_status);
 }
 
-void IeFuelcellCanBridge::update()
+void FuelCellCanBridge::update()
 {
 	if (_enabled && _status.connected) {
 		const uint64_t now = hrt_absolute_time();
@@ -117,14 +116,14 @@ void IeFuelcellCanBridge::update()
 	}
 }
 
-void IeFuelcellCanBridge::print_status() const
+void FuelCellCanBridge::print_status() const
 {
 	if (!_enabled) {
-		printf("IE fuel cell CAN: disabled\n");
+		printf("Fuel cell CAN: disabled\n");
 		return;
 	}
 
-	printf("IE fuel cell CAN%u: %s, format 2, receive only\n", unsigned(_status.interface),
+	printf("Fuel cell CAN%u: %s, format 2, receive only\n", unsigned(_status.interface),
 	       _status.connected ? "connected" : "waiting/stale");
 	printf("  received: %lu, repeated counter: %lu, invalid: %lu\n", (unsigned long)_status.received_frames,
 	       (unsigned long)_status.duplicate_frames, (unsigned long)_invalid_frames);

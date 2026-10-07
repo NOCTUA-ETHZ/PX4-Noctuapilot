@@ -1,0 +1,5 @@
+menuconfig DRIVERS_FUEL_CELL
+ bool "fuel_cell"
+ default n
+ help
+  Intelligent Energy fuel-cell telemetry over UART or CAN.
