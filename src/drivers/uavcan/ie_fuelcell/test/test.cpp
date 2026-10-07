@@ -31,7 +31,7 @@ int param_get(int id, void *value)
 	return 0;
 }
 
-static const uint8_t Golden[8] = {0x25, 0x58, 0xc6, 0x67, 0x84, 0x20, 0xef, 0x55};
+static const uint8_t Golden[8] = {0x52, 0x96, 0x1f, 0x11, 0x18, 0x82, 0x7b, 0xd5};
 
 static void close_to(float actual, float expected)
 {
@@ -49,6 +49,19 @@ static void test_protocol()
 	close_to(status.battery_power_w, -50.f);
 	assert(status.counter == 5 && status.state == 2 && status.error == 21);
 
+	// Actual MCU v3.63 capture. Voltage agrees with the independently logged
+	// ~46.2 V battery; the old LSB-first decoder incorrectly produced 0.7 V.
+	const uint8_t captured[8] = {0x80, 0x00, 0x1c, 0xe0, 0x00, 0x01, 0x3e, 0x60};
+	assert(ie_fuelcell::decode(0x400, true, false, false, captured, 8, status));
+	close_to(status.battery_voltage_v, 46.2f);
+	close_to(status.tank_pressure_bar, 0.f);
+	close_to(status.output_power_w, 0.f);
+	assert(status.counter == 8 && status.state == 0 && status.error == 32);
+	// These only verify the manual's conversions, not physical correctness
+	// on MCU v3.63: the battery-power discrepancy remains under investigation.
+	close_to(status.stack_power_w, 5.f);
+	close_to(status.battery_power_w, -2510.f);
+
 	// Verify every wire bit independently, including field boundaries and the
 	// sign/bias of battery power. The reference uses the manual's bit offsets.
 	const unsigned starts[] = {8, 18, 28, 38, 48};
@@ -56,7 +69,7 @@ static void test_protocol()
 
 	for (unsigned bit = 0; bit < 64; ++bit) {
 		uint8_t bytes[8]{};
-		bytes[bit / 8] = 1u << (bit % 8);
+		bytes[bit / 8] = 1u << (7 - bit % 8);
 		assert(ie_fuelcell::decode(0x400, true, false, false, bytes, 8, status));
 		const float fields[] = {status.tank_pressure_bar, status.battery_voltage_v, status.output_power_w,
 					status.stack_power_w, status.battery_power_w};
@@ -65,15 +78,15 @@ static void test_protocol()
 			float expected = field == 4 ? -5000.f : 0.f;
 
 			if (bit >= starts[field] && bit < starts[field] + 10) {
-				expected += float(1u << (bit - starts[field])) * scales[field];
+				expected += float(1u << (starts[field] + 9 - bit)) * scales[field];
 			}
 
 			close_to(fields[field], expected);
 		}
 
-		assert(status.counter == (bit < 4 ? 1u << bit : 0));
-		assert(status.state == (bit >= 4 && bit < 8 ? 1u << (bit - 4) : 0));
-		assert(status.error == (bit >= 58 ? 1u << (bit - 58) : 0));
+		assert(status.counter == (bit < 4 ? 1u << (3 - bit) : 0));
+		assert(status.state == (bit >= 4 && bit < 8 ? 1u << (7 - bit) : 0));
+		assert(status.error == (bit >= 58 ? 1u << (63 - bit) : 0));
 	}
 
 	uint8_t maximum[8];
@@ -89,8 +102,8 @@ static void test_protocol()
 	// The CAN battery power is offset-binary, not a signed 10-bit integer.
 	for (unsigned raw = 0; raw < 1024; ++raw) {
 		uint8_t bytes[8]{};
-		bytes[6] = raw & 0xff;
-		bytes[7] = raw >> 8;
+		bytes[6] = raw >> 2;
+		bytes[7] = (raw & 3u) << 6;
 		assert(ie_fuelcell::decode(0x400, true, false, false, bytes, 8, status));
 		close_to(status.battery_power_w, int(raw) * 10.f - 5000.f);
 	}
@@ -174,7 +187,7 @@ public:
 		     uint8_t length = 8)
 	{
 		uavcan::CanFrame frame(id, Golden, length);
-		frame.data[0] = (frame.data[0] & 0xf0) | counter;
+		frame.data[0] = (frame.data[0] & 0x0f) | (counter << 4);
 		driver.interfaces[interface].input.push_back({frame, 0});
 		assert(spinOnce() >= 0);
 	}
@@ -224,14 +237,15 @@ static void test_bridge()
 		assert(test_publications == publications + 1 && test_last.timestamp_sample == test_now);
 		assert(test_last.received_frames == 3 && test_last.duplicate_frames == 1);
 		assert(test_last.connected);
-		assert(test_last.raw_data[0] == 0x20);
+		assert(test_last.raw_data[0] == 0x02);
 		assert(memcmp(test_last.raw_data + 1, Golden + 1, 7) == 0);
 
 		// Same counter with a changed measurement must update that measurement.
 		test_now += 100000;
 		uavcan::CanFrame changed(uavcan::CanFrame::FlagEFF | 0x400, Golden, 8);
-		changed.data[0] = 0x20;
-		changed.data[6] += 10; // battery power -50 W -> +50 W
+		changed.data[0] = 0x02;
+		changed.data[6] = 0x7e; // raw 505: battery power -50 W -> +50 W
+		changed.data[7] = 0x55;
 		node.driver.interfaces[1].input.push_back({changed, 0});
 		assert(node.spinOnce() >= 0);
 		close_to(test_last.battery_power_w, 50.f);

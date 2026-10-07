@@ -24,6 +24,25 @@ same bitrate on a shared physical bus. This PX4 UAVCAN driver applies
 `UAVCAN_BITRATE` to both interfaces; the bridge does not provide an independent
 bitrate for CAN2.
 
+## Wire ordering and hardware validation
+
+Fields are packed most significant bit first, in table order. Byte 0 holds
+counter in its high nibble and state in its low nibble. The table's Bit 0
+column denotes the first/MSB bit, not a C least-significant-bit offset.
+
+The captured MCU v3.63 payload `80 00 1c e0 00 01 3e 60` decodes to counter 8,
+state 0, tank 0 bar, battery 46.2 V, output 0 W and raw error 32. The voltage
+agrees with the earlier manufacturer log; the previous LSB-first decoder
+reported 0.7 V and state 8. Counter repetition remains diagnostic only.
+
+**Remaining hardware check:** applying the manual's power scales to this
+capture gives SM input 5 W and battery power -2510 W. Battery power is not
+plausible for the reported bench conditions. Do not treat the power fields
+or raw error meaning as hardware-validated yet. A simultaneous manufacturer
+readout and CAN capture, or MCU v3.63 protocol specification, is needed to
+resolve the remaining layout/scaling discrepancy. No guessed scale or
+firmware-specific fault mapping is applied.
+
 ## Configuration and bench check
 
 1. In the fuel-cell configuration, select customer CAN **format 2**, and match

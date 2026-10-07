@@ -31,17 +31,19 @@ inline bool decode(uint32_t id, bool extended, bool remote, bool error, const ui
 		return false;
 	}
 
-	// Fields span adjacent bytes, least significant bits first. Avoid packed
-	// structs, unaligned loads and implementation-defined C++ bitfield layout.
-	status.counter = bytes[0] & 0x0f;
-	status.state = bytes[0] >> 4;
-	status.tank_pressure_bar = (bytes[1] | ((bytes[2] & 0x03u) << 8)) * 0.5f;
-	status.battery_voltage_v = ((bytes[2] >> 2) | ((bytes[3] & 0x0fu) << 6)) * 0.1f;
-	status.output_power_w = ((bytes[3] >> 4) | ((bytes[4] & 0x3fu) << 4)) * 10.f;
-	status.stack_power_w = ((bytes[4] >> 6) | (bytes[5] << 2)) * 5.f;
-	// The documented range is -5000..5230 W: subtract the 5000 W bias.
-	status.battery_power_w = (bytes[6] | ((bytes[7] & 0x03u) << 8)) * 10.f - 5000.f;
-	status.error = bytes[7] >> 2;
+	// Fields follow the table from left to right, most significant bit first.
+	// The table's "Bit 0" is the first (MSB) bit on the wire, not the C bit 0.
+	// Avoid packed structs, unaligned loads and C++ bitfield layout assumptions.
+	status.counter = bytes[0] >> 4;
+	status.state = bytes[0] & 0x0fu;
+	status.tank_pressure_bar = ((bytes[1] << 2) | (bytes[2] >> 6)) * 0.5f;
+	status.battery_voltage_v = (((bytes[2] & 0x3fu) << 4) | (bytes[3] >> 4)) * 0.1f;
+	status.output_power_w = (((bytes[3] & 0x0fu) << 6) | (bytes[4] >> 2)) * 10.f;
+	status.stack_power_w = (((bytes[4] & 0x03u) << 8) | bytes[5]) * 5.f;
+	// Retain the manual's -5000..5230 W range; MCU v3.63 scaling still needs
+	// comparison with simultaneous manufacturer telemetry (see README).
+	status.battery_power_w = ((bytes[6] << 2) | (bytes[7] >> 6)) * 10.f - 5000.f;
+	status.error = bytes[7] & 0x3fu;
 	return true;
 }
 
