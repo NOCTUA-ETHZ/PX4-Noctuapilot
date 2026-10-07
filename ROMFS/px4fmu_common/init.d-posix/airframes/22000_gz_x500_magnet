@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# @name Gazebo x500 with top-mounted docking magnet
+#
+# @type Quadrotor
+#
+
+PX4_SIM_MODEL=${PX4_SIM_MODEL:=x500_magnet}
+
+. ${R}etc/init.d-posix/airframes/4001_gz_x500
+
+# Enable the target sources used by the Noctua docking stack:
+# target GNSS position, UAV velocity, fiducial-marker position, and target
+# velocity. Keep the precision-landing and debug estimator tasks available,
+# and estimate target yaw from the marker observation.
+param set-default VTE_AID_MASK 23
+param set-default VTE_TASK_MASK 3
+param set-default VTE_YAW_EN 1

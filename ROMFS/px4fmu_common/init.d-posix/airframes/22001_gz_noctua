@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# @name Gazebo Noctua with aft docking magnet
+#
+# @type Fixed Wing
+#
+
+PX4_SIM_MODEL=${PX4_SIM_MODEL:=noctua}
+
+. ${R}etc/init.d-posix/airframes/4008_gz_advanced_plane
