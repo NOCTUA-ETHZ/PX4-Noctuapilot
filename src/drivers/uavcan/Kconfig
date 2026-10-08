@@ -110,3 +110,11 @@ menuconfig BOARD_UAVCAN_TIMER_OVERRIDE
 depends on DRIVERS_UAVCAN
     int "UAVCAN timer override"
     default 0
+
+config UAVCAN_FUEL_CELL
+	bool "Fuel cell raw CAN telemetry"
+	depends on DRIVERS_UAVCAN && DRIVERS_FUEL_CELL
+	default n
+	help
+		Receive S800 customer CAN format 2 through the UAVCAN raw listener.
+		Select CAN1 or CAN2 with FC_INTERFACE.

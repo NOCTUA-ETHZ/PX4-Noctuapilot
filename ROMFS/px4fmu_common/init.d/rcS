@@ -649,6 +649,12 @@ else
 		zenoh start
 	fi
 
+	# UART fuel_cell is started by rc.serial with the selected serial port.
+	if param compare -s FC_INTERFACE 2 || param compare -s FC_INTERFACE 3
+	then
+		fuel_cell start
+	fi
+
 #
 # End of autostart.
 #

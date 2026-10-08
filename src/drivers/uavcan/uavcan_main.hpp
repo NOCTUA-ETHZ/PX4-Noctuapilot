@@ -58,6 +58,10 @@
 
 #include "allocator.hpp"
 
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+#include "fuel_cell/Bridge.hpp"
+#endif
+
 #if defined(CONFIG_UAVCAN_ARMING_CONTROLLER)
 #include "arming_status.hpp"
 #endif
@@ -256,6 +260,9 @@ private:
 
 	bool                    _node_init{false};
 	uavcan::Node<>			_node;				///< library instance
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+	FuelCellCanBridge _fuel_cell_can{_node};
+#endif
 	pthread_mutex_t			_node_mutex;
 
 #if defined(CONFIG_UAVCAN_ARMING_CONTROLLER)

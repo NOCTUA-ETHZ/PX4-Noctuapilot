@@ -625,7 +625,11 @@ UavcanNode::init(uavcan::NodeID node_id, UAVCAN_DRIVER::BusEvent &bus_events)
 		}
 	}
 
-	// Start the Node
+	// Install raw telemetry reception before starting the node.
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+	_fuel_cell_can.init();
+#endif
+
 	return _node.start();
 }
 
@@ -747,6 +751,9 @@ UavcanNode::Run()
 	}
 
 	_node.spinOnce(); // expected to be non-blocking
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+	_fuel_cell_can.update();
+#endif
 
 	publish_can_interface_statuses();
 
@@ -1130,6 +1137,11 @@ void UavcanMixingInterfaceServo::Run()
 void
 UavcanNode::print_info()
 {
+#if defined(CONFIG_UAVCAN_FUEL_CELL)
+	pthread_mutex_lock(&_node_mutex);
+	_fuel_cell_can.print_status();
+	pthread_mutex_unlock(&_node_mutex);
+#endif
 	// Memory status
 	printf("Pool allocator status:\n");
 	printf("\tCapacity hard/soft: %" PRIu16 "/%" PRIu16 " blocks\n",
