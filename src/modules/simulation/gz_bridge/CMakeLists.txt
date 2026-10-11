@@ -120,7 +120,7 @@ if (gz-transport_FOUND)
 	endforeach()
 
 	# Setup the environment variables: PX4_GZ_MODELS, PX4_GZ_WORLDS, GZ_SIM_RESOURCE_PATH
-	configure_file(gz_env.sh.in ${PX4_BINARY_DIR}/rootfs/gz_env.sh)
+	configure_file(gz_env.sh.in ${PX4_BINARY_DIR}/rootfs/gz_env.sh @ONLY)
 
 else()
 	# Create fallback targets that provide helpful error messages when Gazebo dependencies are missing
