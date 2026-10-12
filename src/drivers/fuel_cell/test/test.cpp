@@ -43,17 +43,21 @@ int main()
 	fuel_cell_can_s can{};
 	can.connected = true; can.interface = 1; can.timestamp_sample = 3000000;
 	can.battery_voltage_v = 46.2f; can.tank_pressure_bar = 100;
-	can.state = 0; can.error_code = 32; can.battery_power_w = -2510;
+	can.state = 0; can.error_code = 0; can.battery_power_w = -10;
+	can.output_power_w = 700; can.stack_power_w = 830;
 	auto mapped = fuelcell::from_can(can, 2, 3100000, 2000000);
 	assert(mapped.connected && mapped.source == 2 && mapped.timestamp_sample == 3000000);
 	assert(mapped.tank_pressure_bar == 100 && std::isnan(mapped.tankpressure));
-	assert(std::isnan(mapped.regpressure) && std::isnan(mapped.battpower));
-	assert(std::isnan(mapped.outputpower) && std::isnan(mapped.spmpower));
-	assert(mapped.raw_can_error == 32 && mapped.mainerror == -1 && mapped.suberror == -1);
+	assert(std::isnan(mapped.regpressure) && mapped.battpower == -10);
+	assert(mapped.outputpower == 700 && mapped.spmpower == 830);
+	assert(mapped.raw_can_error == 0 && mapped.mainerror == -1 && mapped.suberror == -1);
 	assert(!fuelcell::from_can(can, 3, 3100000, 2000000).connected); // wrong port
 	assert(!fuelcell::from_can(can, 1, 3100000, 2000000).connected); // UART selected
 	assert(!fuelcell::from_can(can, 2, 5000000, 2000000).connected); // exact timeout
 	assert(!fuelcell::from_can(can, 2, 2900000, 2000000).connected); // future stamp
+	auto timed_out = fuelcell::from_can(can, 2, 5000000, 2000000);
+	assert(std::isnan(timed_out.outputpower) && std::isnan(timed_out.spmpower)
+	       && std::isnan(timed_out.battpower));
 	can.connected = false;
 	assert(!fuelcell::from_can(can, 2, 3100000, 2000000).connected);
 	auto stale = fuelcell::unavailable(1, 5000000, sample.timestamp_sample);

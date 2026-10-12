@@ -30,7 +30,7 @@ int param_get(int id, void *value)
 	return 0;
 }
 
-static const uint8_t Golden[8] = {0x52, 0x96, 0x1f, 0x11, 0x18, 0x82, 0x7b, 0xd5};
+static const uint8_t Golden[8] = {0x52, 0x96, 0x1f, 0x11, 0x18, 0x82, 0x3d, 0xf5};
 
 static void close_to(float actual, float expected)
 {
@@ -55,15 +55,36 @@ static void test_protocol()
 	close_to(status.battery_voltage_v, 46.2f);
 	close_to(status.tank_pressure_bar, 0.f);
 	close_to(status.output_power_w, 0.f);
-	assert(status.counter == 8 && status.state == 0 && status.error == 32);
-	// These only verify the manual's conversions, not physical correctness
-	// on MCU v3.63: the battery-power discrepancy remains under investigation.
+	assert(status.counter == 8 && status.state == 0 && status.error == 0);
+	// Byte 7 bit 5 is the missing 10 W power bit, not a fault flag.
 	close_to(status.stack_power_w, 5.f);
-	close_to(status.battery_power_w, -2510.f);
+	close_to(status.battery_power_w, -10.f);
+
+	// Paired MCU v3.63 capture: SPM output is distinct from stack power.
+	// Adjacent battery codes differ by 10 W while the raw fault stays zero.
+	const uint8_t charge[8] = {0x22, 0x77, 0x5d, 0x60, 0x8c, 0x5f, 0x3f, 0xa0};
+	assert(fuelcell_can::decode(0x400, true, false, false, charge, 8, status));
+	close_to(status.output_power_w, 350.f);
+	close_to(status.stack_power_w, 475.f);
+	close_to(status.battery_power_w, 90.f);
+	assert(status.error == 0);
+	uint8_t adjacent[8];
+	memcpy(adjacent, charge, sizeof(adjacent));
+	adjacent[7] = 0x80;
+	assert(fuelcell_can::decode(0x400, true, false, false, adjacent, 8, status));
+	close_to(status.battery_power_w, 80.f);
+	assert(status.error == 0);
+	const uint8_t discharge[8] = {0x52, 0x76, 0xd9, 0x44, 0x9c, 0x8e, 0x21, 0xc0};
+	assert(fuelcell_can::decode(0x400, true, false, false, discharge, 8, status));
+	close_to(status.output_power_w, 2950.f);
+	close_to(status.stack_power_w, 710.f);
+	close_to(status.battery_power_w, -2300.f);
+	assert(status.error == 0);
 
 	// Verify every wire bit independently, including field boundaries and the
-	// sign/bias of battery power. The reference uses the manual's bit offsets.
+	// sign/bias of battery power. The reference includes the corrected battery/error boundary.
 	const unsigned starts[] = {8, 18, 28, 38, 48};
+	const unsigned widths[] = {10, 10, 10, 10, 11};
 	const float scales[] = {0.5f, 0.1f, 10.f, 5.f, 10.f};
 
 	for (unsigned bit = 0; bit < 64; ++bit) {
@@ -76,8 +97,8 @@ static void test_protocol()
 		for (unsigned field = 0; field < 5; ++field) {
 			float expected = field == 4 ? -5000.f : 0.f;
 
-			if (bit >= starts[field] && bit < starts[field] + 10) {
-				expected += float(1u << (starts[field] + 9 - bit)) * scales[field];
+			if (bit >= starts[field] && bit < starts[field] + widths[field]) {
+				expected += float(1u << (starts[field] + widths[field] - 1 - bit)) * scales[field];
 			}
 
 			close_to(fields[field], expected);
@@ -85,7 +106,7 @@ static void test_protocol()
 
 		assert(status.counter == (bit < 4 ? 1u << (3 - bit) : 0));
 		assert(status.state == (bit >= 4 && bit < 8 ? 1u << (7 - bit) : 0));
-		assert(status.error == (bit >= 58 ? 1u << (63 - bit) : 0));
+		assert(status.error == (bit >= 59 ? 1u << (63 - bit) : 0));
 	}
 
 	uint8_t maximum[8];
@@ -95,14 +116,14 @@ static void test_protocol()
 	close_to(status.battery_voltage_v, 102.3f);
 	close_to(status.output_power_w, 10230.f);
 	close_to(status.stack_power_w, 5115.f);
-	close_to(status.battery_power_w, 5230.f);
-	assert(status.counter == 15 && status.state == 15 && status.error == 63);
+	close_to(status.battery_power_w, 15470.f);
+	assert(status.counter == 15 && status.state == 15 && status.error == 31);
 
-	// The CAN battery power is offset-binary, not a signed 10-bit integer.
-	for (unsigned raw = 0; raw < 1024; ++raw) {
+	// The CAN battery power is offset-binary, not a signed integer.
+	for (unsigned raw = 0; raw < 2048; ++raw) {
 		uint8_t bytes[8]{};
-		bytes[6] = raw >> 2;
-		bytes[7] = (raw & 3u) << 6;
+		bytes[6] = raw >> 3;
+		bytes[7] = (raw & 7u) << 5;
 		assert(fuelcell_can::decode(0x400, true, false, false, bytes, 8, status));
 		close_to(status.battery_power_w, int(raw) * 10.f - 5000.f);
 	}
@@ -243,8 +264,8 @@ static void test_bridge()
 		test_now += 100000;
 		uavcan::CanFrame changed(uavcan::CanFrame::FlagEFF | 0x400, Golden, 8);
 		changed.data[0] = 0x02;
-		changed.data[6] = 0x7e; // raw 505: battery power -50 W -> +50 W
-		changed.data[7] = 0x55;
+		changed.data[6] = 0x3f; // raw 505: battery power -50 W -> +50 W
+		changed.data[7] = 0x35;
 		node.driver.interfaces[1].input.push_back({changed, 0});
 		assert(node.spinOnce() >= 0);
 		close_to(test_last.battery_power_w, 50.f);

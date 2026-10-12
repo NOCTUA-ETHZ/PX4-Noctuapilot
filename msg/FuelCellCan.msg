@@ -5,14 +5,14 @@ uint64 timestamp_sample           # Last accepted frame reception, microseconds 
 float32 tank_pressure_bar         # Cylinder gauge pressure in bar; NOT hydrogen percent
 float32 battery_voltage_v         # Hybrid battery voltage in V
 float32 output_power_w            # Combined output power in W
-float32 stack_power_w             # SM input power as specified by the CAN protocol, W
+float32 stack_power_w             # SPM output power in W (historical field name; MCU v3.63 format 2)
 float32 battery_power_w           # Signed hybrid battery power in W, raw * 10 - 5000
 uint32 received_frames            # All accepted extended 0x400 frames with DLC 8
 uint32 duplicate_frames           # Repeated counter observations, not necessarily duplicate payloads
 uint8 interface                   # 1-based CAN interface (1 = CAN1 on Pixhawk 6C)
 uint8 counter                     # Four-bit FCPM cyclic counter
 uint8 state                       # Raw four-bit FCPM state
-uint8 error_code                  # Raw six-bit CAN error code; no UART subcode is available
+uint8 error_code                  # Raw low five CAN bits; no UART main/subcode mapping is established
 uint8[8] raw_data                  # Last accepted CAN payload, in wire byte order
 bool connected                    # A matching frame arrived within timeout; not proof of valid decoding
 

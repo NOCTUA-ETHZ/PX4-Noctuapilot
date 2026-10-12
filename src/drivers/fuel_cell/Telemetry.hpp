@@ -42,8 +42,10 @@ inline fuel_cell_s from_can(const fuel_cell_can_s &can, uint8_t source, uint64_t
 	out.tank_pressure_bar = can.tank_pressure_bar;
 	out.psustate = can.state;
 	out.raw_can_error = can.error_code;
-	// CAN powers disagree with UART on MCU v3.63. Keep unverified values
-	// out of the shared topic; retain them in internal CAN diagnostics.
+	out.outputpower = can.output_power_w;
+	// The internal field retains its historical name; it carries SPM output.
+	out.spmpower = can.stack_power_w;
+	out.battpower = can.battery_power_w;
 	return out;
 }
 

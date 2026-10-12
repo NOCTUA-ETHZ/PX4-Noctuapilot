@@ -80,20 +80,29 @@ message schema**. Copy the updated `msg/FuelCell.msg` into the companion's px4_m
 package and rebuild affected ROS 2 packages before using DDS with this
 firmware. No automatic changes are made to a companion or its message repo.
 
-## CAN validation limitation
+## CAN validation (MCU v3.63, customer format 2)
 
-The MSB-first decoder now agrees with UART for voltage/state and advances
-its counter. The captured payload `80 00 1c e0 00 01 3e 60` gives 46.2 V,
-state 0 and raw CAN error 32. UART at the reported bench condition showed
-main/suberror 36/5. Their mapping has not been established.
+Paired raw CAN and manufacturer telemetry from one run confirm the output
+power (10 W resolution), SPM output power (5 W) and battery power (10 W).
+These are now published as `outputpower`, `spmpower` and `battpower`.
+The internal `stack_power_w` name is retained for compatibility, but its
+measurement matches the manufacturer's **SPM_Output_Power**, not Stack_Power.
+Positive battery power means charging; negative means discharging.
 
-The manual V1.2 scales give battery power -2510 W for this capture while
-UART reports around -15 W. Output/stack power also differ. Until this
-firmware/layout discrepancy is resolved, **all three CAN power fields are
-NaN in the public fuel_cell topic**. Unverified decoded powers and raw bytes
-remain visible in `fuel_cell status` and the internal `fuel_cell_can` topic,
-which is logged for diagnosis. This avoids introducing known-bad CAN power
-into existing consumers. UART powers remain published unchanged.
+Battery power uses `(byte6 * 8 + (byte7 >> 5)) * 10 - 5000`.
+The previous decoder dropped byte 7 bit 5 and included it in the error code,
+causing approximately -2500 W at idle and spurious error 32 transitions.
+For example, `80 00 1c e0 00 01 3e 60` now decodes to 46.2 V, 0 W output,
+5 W SPM output, -10 W battery and low-five-bit raw error 0.
+
+Validation covered 5,685 frames, including charging and discharging.
+The recording clocks required approximately 402.4 seconds of alignment;
+values are not expected to match exactly across the 10 Hz CAN and 1 Hz CSV.
+The observed battery range was -2300 to +220 W. The upper encoding range and
+nonzero low-five-bit fault meanings were not exercised by this recording.
+A firmware-specific protocol specification or paired fault capture is still
+required to establish fault meanings; no UART main/suberror is synthesized.
+UART decoding and the public message schema are unchanged.
 
 There are no CAN control transmissions, voltage/power overrides or new
 flight failsafes. This is receive-only telemetry.

@@ -196,7 +196,7 @@ int FuelCell::print_status()
 		printf("  CAN payload:");
 		for (uint8_t b : can.raw_data) { printf(" %02x", unsigned(b)); }
 		printf("\n");
-		PX4_INFO("Unverified CAN power W: output %.1f, stack %.1f, battery %.1f",
+		PX4_INFO("CAN power W: output %.1f, SPM %.1f, battery %.1f",
 			 (double)can.output_power_w, (double)can.stack_power_w, (double)can.battery_power_w);
 	}
 

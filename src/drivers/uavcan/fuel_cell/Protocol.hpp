@@ -40,10 +40,10 @@ inline bool decode(uint32_t id, bool extended, bool remote, bool error, const ui
 	status.battery_voltage_v = (((bytes[2] & 0x3fu) << 4) | (bytes[3] >> 4)) * 0.1f;
 	status.output_power_w = (((bytes[3] & 0x0fu) << 6) | (bytes[4] >> 2)) * 10.f;
 	status.stack_power_w = (((bytes[4] & 0x03u) << 8) | bytes[5]) * 5.f;
-	// Retain the manual's -5000..5230 W range; MCU v3.63 scaling still needs
-	// comparison with simultaneous manufacturer telemetry (see README).
-	status.battery_power_w = ((bytes[6] << 2) | (bytes[7] >> 6)) * 10.f - 5000.f;
-	status.error = bytes[7] & 0x3fu;
+	// MCU v3.63 format 2: byte 7 bit 5 belongs to battery power, not error.
+	// Validated against paired CAN/manufacturer telemetry; see README.
+	status.battery_power_w = ((bytes[6] << 3) | (bytes[7] >> 5)) * 10.f - 5000.f;
+	status.error = bytes[7] & 0x1fu;
 	return true;
 }
 
