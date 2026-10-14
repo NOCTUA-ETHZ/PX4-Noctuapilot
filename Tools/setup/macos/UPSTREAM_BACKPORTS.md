@@ -25,6 +25,8 @@ flight stack is not merged: this branch retains its uint16_t actuator outputs.
 | OpticalFlow unused fields | [f32c3024b8](https://github.com/PX4/PX4-Autopilot/commit/f32c3024b832e2748476845d0ea3959930668ded) | Exact upstream header hunk. |
 | OpticalFlow focal-length conversion | [fd1ddbc22e / PR #28715](https://github.com/PX4/PX4-Autopilot/commit/fd1ddbc22e31e7dd9718ecf686b67a065f586374) | Exact upstream main hunk. This fix is not in the reviewed release/1.18 snapshot. |
 
+| Gazebo Classic compatibility with extended gimbal capabilities | [f835e077d0 / PR #1090](https://github.com/PX4/PX4-SITL_gazebo-classic/commit/f835e077d06eaf09a57d5152fcfb85244b53b77a) | Submodule advanced to the exact revision pinned by upstream `release/1.18`. Includes seven upstream commits since this branch's previous pin: MAVLink v2 cleanup, visualization fixes, configurable dialect support, first-message delivery and the missing gimbal `cap_flags2` argument. No local Classic source patch. |
+
 The locked environment is present in official main but absent from the reviewed
 release/1.18 snapshot. The latter still installs simulation packages with
 Homebrew. Therefore this is not exclusively a set of 1.18 backports.
