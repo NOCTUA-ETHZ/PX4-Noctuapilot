@@ -1407,6 +1407,11 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 
 	switch (_mode) {
 	case MAVLINK_MODE_NORMAL:
+#if defined(MAVLINK_MSG_ID_NOCTUA_FUEL_CELL_STATUS)
+		configure_stream_local("NOCTUA_FUEL_CELL_STATUS", 2.0f);
+		configure_stream_local("NOCTUA_FUEL_CELL_CAN_DIAGNOSTICS", 1.0f);
+		configure_stream_local("NOCTUA_GAS_SENSOR", 2.0f);
+#endif
 		configure_stream_local("ADSB_VEHICLE", unlimited_rate);
 		configure_stream_local("ALTITUDE", 1.0f);
 		configure_stream_local("ATTITUDE", 15.0f);
