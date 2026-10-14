@@ -92,7 +92,7 @@ inline bool parse(char *line, fuel_cell_s &out, uint64_t now)
 
 	if (!integer(last_comma + 1, checksum) || checksum != int(255 - (sum & 255))) { return false; }
 
-	char *fields[20]{};
+	char *fields[20] {};
 	unsigned count = 0;
 	fields[count++] = line + 1;
 
@@ -138,12 +138,13 @@ public:
 		}
 
 		if (!_discard && _length < sizeof(_line) - 1) { _line[_length++] = c; }
+
 		else { _discard = true; }
 
 		return false;
 	}
 private:
-	char _line[256]{};
+	char _line[256] {};
 	size_t _length{0};
 	bool _discard{false};
 };

@@ -1,7 +1,6 @@
 [submodule "src/modules/mavlink/mavlink"]
 	path = src/modules/mavlink/mavlink
-	url = https://github.com/mavlink/mavlink.git
-	branch = master
+	url = git@github.com:NOCTUA-ETHZ/noctua-mavlink.git
 [submodule "src/modules/simulation/gz_plugins/optical_flow/PX4-OpticalFlow"]
 	path = src/modules/simulation/gz_plugins/optical_flow/PX4-OpticalFlow
 	url = https://github.com/PX4/PX4-OpticalFlow.git

@@ -49,6 +49,11 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      - name: Prepare pinned Noctua MAVLink
+        uses: ./.github/actions/setup-noctua-mavlink
+        with:
+          ssh-key: ${{ secrets.NOCTUA_MAVLINK_READ_KEY }}
+
       - name: Install Deps, Build, and Make Quick Check
         run: |
           # we need to install dependencies and build on the same step

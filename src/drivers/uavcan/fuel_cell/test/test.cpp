@@ -20,7 +20,9 @@ uint64_t hrt_absolute_time() { return test_now; }
 int param_find(const char *name)
 {
 	if (!strcmp(name, "FC_INTERFACE")) { return 0; }
+
 	if (!strcmp(name, "FC_TIMEOUT")) { return 2; }
+
 	assert(false);
 	return -1;
 }
@@ -88,11 +90,12 @@ static void test_protocol()
 	const float scales[] = {0.5f, 0.1f, 10.f, 5.f, 10.f};
 
 	for (unsigned bit = 0; bit < 64; ++bit) {
-		uint8_t bytes[8]{};
+		uint8_t bytes[8] {};
 		bytes[bit / 8] = 1u << (7 - bit % 8);
 		assert(fuelcell_can::decode(0x400, true, false, false, bytes, 8, status));
 		const float fields[] = {status.tank_pressure_bar, status.battery_voltage_v, status.output_power_w,
-					status.stack_power_w, status.battery_power_w};
+					status.stack_power_w, status.battery_power_w
+				       };
 
 		for (unsigned field = 0; field < 5; ++field) {
 			float expected = field == 4 ? -5000.f : 0.f;
@@ -121,7 +124,7 @@ static void test_protocol()
 
 	// The CAN battery power is offset-binary, not a signed integer.
 	for (unsigned raw = 0; raw < 2048; ++raw) {
-		uint8_t bytes[8]{};
+		uint8_t bytes[8] {};
 		bytes[6] = raw >> 3;
 		bytes[7] = (raw & 7u) << 5;
 		assert(fuelcell_can::decode(0x400, true, false, false, bytes, 8, status));
@@ -164,6 +167,7 @@ public:
 			uavcan::CanIOFlags &flags) override
 	{
 		if (input.empty()) { return 0; }
+
 		frame = input.front().frame;
 		flags = input.front().flags;
 		input.pop_front();
@@ -182,7 +186,7 @@ public:
 	CanInterface interfaces[2];
 	uavcan::ICanIface *getIface(uint8_t index) override { return index < 2 ? &interfaces[index] : nullptr; }
 	uint8_t getNumIfaces() const override { return 2; }
-	int16_t select(uavcan::CanSelectMasks &masks, const uavcan::CanFrame *(&)[uavcan::MaxCanIfaces],
+	int16_t select(uavcan::CanSelectMasks &masks, const uavcan::CanFrame * (&)[uavcan::MaxCanIfaces],
 		       uavcan::MonotonicTime) override
 	{
 		masks.read = (interfaces[0].input.empty() ? 0 : 1) | (interfaces[1].input.empty() ? 0 : 2);

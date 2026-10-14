@@ -201,6 +201,7 @@ int NoctuaTelemetrySim::print_usage(const char *reason)
 	PRINT_MODULE_USAGE_NAME("noctua_telemetry_sim", "system");
 	PRINT_MODULE_USAGE_COMMAND("start");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("source", "Select uart or can");
+	PRINT_MODULE_USAGE_ARG("uart|can", "Fuel-cell transport to simulate", false);
 	PRINT_MODULE_USAGE_COMMAND_DESCR("pause", "Stop publishing simulated samples");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("resume", "Resume publishing simulated samples");
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();

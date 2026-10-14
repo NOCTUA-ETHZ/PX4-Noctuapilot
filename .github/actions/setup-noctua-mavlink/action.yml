@@ -1,0 +1,25 @@
+name: Pinned Noctua MAVLink
+description: Check out the private MAVLink revision pinned by the PX4 gitlink
+inputs:
+  ssh-key:
+    description: Read-only deploy key for NOCTUA-ETHZ/noctua-mavlink
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Resolve pinned dependency
+      id: revision
+      shell: bash
+      run: |
+        revision=$(git ls-tree HEAD src/modules/mavlink/mavlink | awk '{print $3}')
+        test -n "$revision"
+        echo "sha=$revision" >> "$GITHUB_OUTPUT"
+    - name: Checkout private MAVLink
+      uses: actions/checkout@v4
+      with:
+        repository: NOCTUA-ETHZ/noctua-mavlink
+        ref: ${{ steps.revision.outputs.sha }}
+        path: src/modules/mavlink/mavlink
+        ssh-key: ${{ inputs.ssh-key }}
+        persist-credentials: false
+        submodules: recursive

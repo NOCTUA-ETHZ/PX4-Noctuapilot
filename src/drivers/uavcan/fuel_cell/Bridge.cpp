@@ -64,7 +64,7 @@ void FuelCellCanBridge::handleRxFrame(const uavcan::CanRxFrame &frame, uavcan::C
 	fuelcell_can::Status decoded{};
 
 	if (!fuelcell_can::decode(frame.id & uavcan::CanFrame::MaskExtID, frame.isExtended(),
-				frame.isRemoteTransmissionRequest(), frame.isErrorFrame(), frame.data, frame.dlc, decoded)) {
+				  frame.isRemoteTransmissionRequest(), frame.isErrorFrame(), frame.data, frame.dlc, decoded)) {
 		++_invalid_frames;
 		return;
 	}

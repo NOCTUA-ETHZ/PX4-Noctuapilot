@@ -39,7 +39,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive
+          submodules: false
+
+      - name: Prepare pinned Noctua MAVLink
+        uses: ./.github/actions/setup-noctua-mavlink
+        with:
+          ssh-key: ${{ secrets.NOCTUA_MAVLINK_READ_KEY }}
 
       - name: Git ownership workaround
         run: git config --system --add safe.directory '*'

@@ -24,8 +24,7 @@ export GZ_DISTRO=harmonic
 ulimit -S -n 2048
 
 cmake -S . -B build/px4_sitl_noctua -UPX4_CONFIG_FILE \
-  -DCONFIG=px4_sitl_noctua \
-  -DNOCTUA_MAVLINK_SOURCE_DIR="$PWD/../noctua-mavlink"
+  -DCONFIG=px4_sitl_noctua -UNOCTUA_MAVLINK_SOURCE_DIR
 cmake --build build/px4_sitl_noctua --parallel 4
 ```
 
@@ -81,7 +80,7 @@ unavailable semantics, pause/resume and clean module shutdown.
 ```sh
 python src/modules/simulation/noctua_telemetry_sim/test/smoke.py \
   --build-dir build/px4_sitl_noctua \
-  --mavlink-dir ../noctua-mavlink
+  --mavlink-dir src/modules/mavlink/mavlink
 ```
 
 The test starts its own PX4 instance and never arms or commands a vehicle.
