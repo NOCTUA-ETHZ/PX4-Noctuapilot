@@ -1,0 +1,2 @@
+# Standard SITL plus an explicitly enabled Noctua telemetry demo.
+CONFIG_MODULES_SIMULATION_NOCTUA_TELEMETRY_SIM=y

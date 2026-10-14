@@ -1,0 +1,7 @@
+menuconfig MODULES_SIMULATION_NOCTUA_TELEMETRY_SIM
+	bool "noctua_telemetry_sim"
+	default n
+	depends on PLATFORM_POSIX
+	---help---
+		SITL-only demo publisher for Noctua fuel-cell and H2-probe telemetry.
+		Does not simulate hydrogen physics or change flight behavior.
