@@ -21,6 +21,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Prepare pinned Noctua MAVLink
+        uses: ./.github/actions/setup-noctua-mavlink
+        with:
+          ssh-key: ${{ secrets.NOCTUA_MAVLINK_READ_KEY }}
+
       - name: main test
         run: |
           cd "$GITHUB_WORKSPACE"

@@ -11,9 +11,19 @@ runs:
       id: revision
       shell: bash
       run: |
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        git config --global --add safe.directory "$GITHUB_WORKSPACE/src/modules/mavlink/mavlink"
+        git config --global --add safe.directory "$GITHUB_WORKSPACE/src/modules/mavlink/mavlink/pymavlink"
         revision=$(git ls-tree HEAD src/modules/mavlink/mavlink | awk '{print $3}')
         test -n "$revision"
         echo "sha=$revision" >> "$GITHUB_OUTPUT"
+    - name: Ensure SSH is available in build containers
+      shell: bash
+      run: |
+        if ! command -v ssh >/dev/null 2>&1; then
+          apt-get update
+          apt-get install -y --no-install-recommends openssh-client
+        fi
     - name: Checkout private MAVLink
       uses: actions/checkout@v4
       with:
