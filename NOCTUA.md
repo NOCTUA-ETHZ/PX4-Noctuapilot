@@ -22,7 +22,7 @@ git submodule update --init --recursive src/modules/mavlink/mavlink
 
 Normal builds need no external MAVLink path. `NOCTUA_MAVLINK_SOURCE_DIR` remains
 an optional override for developing changes in a separate checkout.
-Normal/GCS mode sends fuel-cell status and
+Normal/GCS and Onboard modes (including USB) send fuel-cell status and
 gas-probe samples at up to 2 Hz and CAN diagnostics at up to 1 Hz, when their
 uORB topics publish. UART and CAN retain their own units and availability;
 the newer base branch supplies validated MCU v3.63 CAN power decoding.

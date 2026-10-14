@@ -84,3 +84,7 @@ python src/modules/simulation/noctua_telemetry_sim/test/smoke.py \
 ```
 
 The test starts its own PX4 instance and never arms or commands a vehicle.
+
+Repeat it with `--mavlink-mode onboard` to cover the default USB telemetry
+profile. Both modes must deliver fuel-cell status, CAN diagnostics and gas
+samples without manual stream requests.

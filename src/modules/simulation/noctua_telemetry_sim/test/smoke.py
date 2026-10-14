@@ -25,6 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, required=True)
     parser.add_argument("--mavlink-dir", type=Path, required=True)
+    parser.add_argument("--mavlink-mode", choices=("normal", "onboard"), default="normal")
     args = parser.parse_args()
     build = args.build_dir.resolve()
     mavlink = args.mavlink_dir.resolve()
@@ -68,7 +69,8 @@ def main():
             "dataman start\n"
             "simulator_sih start\n"
             "noctua_telemetry_sim start\n"
-            f"mavlink start -u {sender_port} -o {receiver_port} -t 127.0.0.1 -r 100000\n"
+            f"mavlink start -u {sender_port} -o {receiver_port} -t 127.0.0.1 -r 100000 "
+            f"-m {0 if args.mavlink_mode == 'normal' else 2}\n"
             "mavlink boot_complete\n"
         )
 

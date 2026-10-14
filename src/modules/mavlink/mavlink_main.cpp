@@ -1405,13 +1405,19 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 
 	const float unlimited_rate = -1.0f;
 
-	switch (_mode) {
-	case MAVLINK_MODE_NORMAL:
 #if defined(MAVLINK_MSG_ID_NOCTUA_FUEL_CELL_STATUS)
+
+	// USB defaults to Onboard mode; both profiles can carry ground-control telemetry.
+	if (_mode == MAVLINK_MODE_NORMAL || _mode == MAVLINK_MODE_ONBOARD) {
 		configure_stream_local("NOCTUA_FUEL_CELL_STATUS", 2.0f);
 		configure_stream_local("NOCTUA_FUEL_CELL_CAN_DIAGNOSTICS", 1.0f);
 		configure_stream_local("NOCTUA_GAS_SENSOR", 2.0f);
+	}
+
 #endif
+
+	switch (_mode) {
+	case MAVLINK_MODE_NORMAL:
 		configure_stream_local("ADSB_VEHICLE", unlimited_rate);
 		configure_stream_local("ALTITUDE", 1.0f);
 		configure_stream_local("ATTITUDE", 15.0f);
