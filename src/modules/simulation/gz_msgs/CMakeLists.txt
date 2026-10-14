@@ -4,19 +4,18 @@
 #
 ############################################################################
 
-# Find required packages
-find_package(Protobuf)
+# Share Protobuf's imported targets with Gazebo.
+find_package(Protobuf QUIET CONFIG)
+if(NOT Protobuf_FOUND)
+    find_package(Protobuf)
+endif()
 
 if (Protobuf_FOUND)
     # Generate protobuf messages
     file(GLOB MSGS_PROTOS "${CMAKE_CURRENT_SOURCE_DIR}/*.proto")
-    PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${MSGS_PROTOS})
-
     # Create library
-    add_library(px4_gz_msgs STATIC
-        ${PROTO_SRCS}
-        ${PROTO_HDRS}
-    )
+    add_library(px4_gz_msgs STATIC ${MSGS_PROTOS})
+    protobuf_generate(TARGET px4_gz_msgs LANGUAGE cpp APPEND_PATH)
 
     # Disable double-promotion warning for protobuf-generated code
     target_compile_options(px4_gz_msgs PRIVATE -Wno-double-promotion)
@@ -24,9 +23,9 @@ if (Protobuf_FOUND)
     target_include_directories(px4_gz_msgs
         PUBLIC
             ${CMAKE_CURRENT_BINARY_DIR}
-            ${Protobuf_INCLUDE_DIRS}
     )
-    target_link_libraries(px4_gz_msgs PUBLIC ${PROTOBUF_LIBRARIES})
+    # Propagate Protobuf's required C++ standard and dependencies to Gazebo consumers.
+    target_link_libraries(px4_gz_msgs PUBLIC protobuf::libprotobuf)
     if (Protobuf_VERSION VERSION_LESS "3.8")
         target_compile_options(px4_gz_msgs PRIVATE -Wno-error=float-equal)
     endif()
