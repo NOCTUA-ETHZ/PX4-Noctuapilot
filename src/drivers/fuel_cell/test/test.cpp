@@ -7,7 +7,9 @@ static std::string frame(const std::string &fields)
 {
 	std::string text = "<" + fields + ",";
 	unsigned sum = 0;
+
 	for (unsigned char c : text) { sum += c; }
+
 	return text + std::to_string(255 - (sum & 255)) + ">\r\n";
 }
 
@@ -17,7 +19,9 @@ int main()
 	fuel_cell_s sample{};
 	const std::string valid = frame("50,0.91,46.2,15,3,,-15,0,36,5,");
 	unsigned count = 0;
+
 	for (char c : valid) { count += parser.feed(c, sample, 1000000); }
+
 	assert(count == 1 && sample.connected && sample.source == 1);
 	assert(std::fabs(sample.voltage - 46.2f) < 0.001f);
 	assert(sample.battpower == -15 && sample.mainerror == 36 && sample.suberror == 5);
@@ -27,17 +31,24 @@ int main()
 	// Checksum corruption, empty numeric fields and malformed numbers must
 	// never become a plausible zero or move following fields into place.
 	std::string corrupt = valid; corrupt[1] = '6';
-	for (const auto &bad : {corrupt, frame("50,,46.2,15,3,,-15,0,36,5,"),
-		frame("50,0.91,nan,15,3,,-15,0,36,5,"), frame("50,0.91,46.2x,15,3,,-15,0,36,5,"),
-		std::string("[metadata]\r\n"), std::string(300, 'x') + "\r\n"}) {
+
+	for (const auto &bad : {
+		     corrupt, frame("50,,46.2,15,3,,-15,0,36,5,"),
+		     frame("50,0.91,nan,15,3,,-15,0,36,5,"), frame("50,0.91,46.2x,15,3,,-15,0,36,5,"),
+		     std::string("[metadata]\r\n"), std::string(300, 'x') + "\r\n"
+	     }) {
 		for (char c : bad) { assert(!parser.feed(c, sample, 2000000)); }
 	}
 	assert(sample.timestamp_sample == 1000000);
+
 	for (char c : frame("50,0.91,46.2,15,3,,-15,0,36,5,info,20,30,40,50,0")) {
 		count += parser.feed(c, sample, 2100000);
 	}
+
 	assert(count == 2); // extended formats share the original fields
+
 	for (char c : std::string("<truncated") + valid) { count += parser.feed(c, sample, 2200000); }
+
 	assert(count == 3);
 
 	fuel_cell_can_s can{};

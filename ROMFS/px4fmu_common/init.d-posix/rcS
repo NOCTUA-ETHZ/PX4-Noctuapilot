@@ -255,6 +255,16 @@ fi
 
 system_power_simulator start
 
+# Synthetic Noctua data is opt-in, even in the Noctua SITL build.
+if [ "$PX4_NOCTUA_TELEMETRY" = "1" ]
+then
+	if ! noctua_telemetry_sim start
+	then
+		echo "ERROR [init] Build px4_sitl_noctua to enable the Noctua telemetry demo"
+		exit 1
+	fi
+fi
+
 tone_alarm start
 rc_update start
 manual_control start

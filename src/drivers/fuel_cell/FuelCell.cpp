@@ -38,7 +38,7 @@ private:
 	const uint8_t _source;
 	const uint64_t _timeout_us;
 	const int32_t _baud;
-	char _device[32]{};
+	char _device[32] {};
 	int _fd{-1};
 	uint64_t _retry_at{0};
 	bool _started{false};
@@ -55,10 +55,15 @@ bool FuelCell::open_uart()
 
 	switch (_baud) {
 	case 9600: speed = B9600; break;
+
 	case 19200: speed = B19200; break;
+
 	case 38400: speed = B38400; break;
+
 	case 57600: speed = B57600; break;
+
 	case 115200: speed = B115200; break;
+
 	default: return false;
 	}
 
@@ -104,6 +109,7 @@ void FuelCell::Run()
 
 		if (_fd >= 0) {
 			char bytes[256];
+
 			// Bounded, nonblocking reads: never stall a PX4 work queue.
 			for (unsigned batch = 0; batch < 4; ++batch) {
 				const ssize_t n = read(_fd, bytes, sizeof(bytes));
@@ -150,6 +156,7 @@ int FuelCell::task_spawn(int argc, char *argv[])
 	const char *arg = nullptr;
 
 	while ((ch = px4_getopt(argc, argv, "d:", &index, &arg)) != EOF) {
+
 		if (ch == 'd') { device = arg; } else { return print_usage("invalid option"); }
 	}
 
@@ -164,7 +171,9 @@ int FuelCell::task_spawn(int argc, char *argv[])
 	}
 
 #if !defined(CONFIG_UAVCAN_FUEL_CELL)
+
 	if (source > 1) { return print_usage("CAN backend not included in this build"); }
+
 #endif
 	FuelCell *instance = new FuelCell(source, timeout, baud, device);
 
@@ -189,12 +198,15 @@ int FuelCell::print_status()
 		 status.connected ? "connected" : "waiting/stale");
 
 	if (_source == 1) { PX4_INFO("%s, %ld baud", _device, (long)_baud); }
+
 	else {
 		PX4_INFO("RX %lu, repeated counter %lu, counter %u, raw error %u",
 			 (unsigned long)can.received_frames, (unsigned long)can.duplicate_frames,
 			 unsigned(can.counter), unsigned(can.error_code));
 		printf("  CAN payload:");
+
 		for (uint8_t b : can.raw_data) { printf(" %02x", unsigned(b)); }
+
 		printf("\n");
 		PX4_INFO("CAN power W: output %.1f, SPM %.1f, battery %.1f",
 			 (double)can.output_power_w, (double)can.stack_power_w, (double)can.battery_power_w);

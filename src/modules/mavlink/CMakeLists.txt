@@ -33,21 +33,37 @@
 
 set(MAVLINK_GIT_DIR "${CMAKE_CURRENT_LIST_DIR}/mavlink")
 set(MAVLINK_LIBRARY_DIR "${CMAKE_BINARY_DIR}/mavlink")
-file(RELATIVE_PATH MAVLINK_GIT_DIR_RELATIVE ${CMAKE_SOURCE_DIR} ${MAVLINK_GIT_DIR})
 
-px4_add_git_submodule(TARGET git_mavlink_v2 PATH "${MAVLINK_GIT_DIR}")
+set(MAVLINK_GENERATOR ${PYTHON_EXECUTABLE})
+set(NOCTUA_MAVLINK_SOURCE_DIR "" CACHE PATH "Optional Noctua MAVLink checkout")
+if(NOCTUA_MAVLINK_SOURCE_DIR)
+	if(NOT EXISTS "${NOCTUA_MAVLINK_SOURCE_DIR}/message_definitions/v1.0/noctua.xml")
+		message(FATAL_ERROR "NOCTUA_MAVLINK_SOURCE_DIR must contain the Noctua dialect")
+	endif()
+	set(MAVLINK_GIT_DIR "${NOCTUA_MAVLINK_SOURCE_DIR}")
+	add_custom_target(git_mavlink_v2)
+else()
+	px4_add_git_submodule(TARGET git_mavlink_v2 PATH "${MAVLINK_GIT_DIR}")
+endif()
+# Every Noctua board uses the shared dialect, including boards selecting development.
+set(CONFIG_MAVLINK_DIALECT "noctua")
+# Included XML must also trigger regeneration; stabilize generated header ordering.
+file(GLOB NOCTUA_MAVLINK_DEFINITION_FILES "${MAVLINK_GIT_DIR}/message_definitions/v1.0/*.xml")
+set(MAVLINK_GENERATOR ${CMAKE_COMMAND} -E env "PYTHONHASHSEED=0" ${PYTHON_EXECUTABLE})
+file(RELATIVE_PATH MAVLINK_GIT_DIR_RELATIVE ${CMAKE_SOURCE_DIR} ${MAVLINK_GIT_DIR})
 
 # always generate uAvionix dialect
 set(MAVLINK_DIALECT_UAVIONIX "uAvionix")
 add_custom_command(
 	OUTPUT ${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT_UAVIONIX}/${MAVLINK_DIALECT_UAVIONIX}.h
 	COMMAND
-		${PYTHON_EXECUTABLE} ${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
+		${MAVLINK_GENERATOR} ${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
 			--lang C --wire-protocol 2.0
 			--output ${MAVLINK_LIBRARY_DIR}
 			${MAVLINK_GIT_DIR}/message_definitions/v1.0/${MAVLINK_DIALECT_UAVIONIX}.xml > ${CMAKE_CURRENT_BINARY_DIR}/mavgen_${MAVLINK_DIALECT_UAVIONIX}.log
 	DEPENDS
 		git_mavlink_v2
+		${NOCTUA_MAVLINK_DEFINITION_FILES}
 		${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
 		${MAVLINK_GIT_DIR}/message_definitions/v1.0/${MAVLINK_DIALECT_UAVIONIX}.xml
 
@@ -60,12 +76,13 @@ set_source_files_properties(${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT_UAVIONIX}/$
 add_custom_command(
 	OUTPUT ${MAVLINK_LIBRARY_DIR}/${CONFIG_MAVLINK_DIALECT}/${CONFIG_MAVLINK_DIALECT}.h
 	COMMAND
-		${PYTHON_EXECUTABLE} ${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
+		${MAVLINK_GENERATOR} ${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
 			--lang C --wire-protocol 2.0
 			--output ${MAVLINK_LIBRARY_DIR}
 			${MAVLINK_GIT_DIR}/message_definitions/v1.0/${CONFIG_MAVLINK_DIALECT}.xml > ${CMAKE_CURRENT_BINARY_DIR}/mavgen_${CONFIG_MAVLINK_DIALECT}.log
 	DEPENDS
 		git_mavlink_v2
+		${NOCTUA_MAVLINK_DEFINITION_FILES}
 		${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
 		${MAVLINK_GIT_DIR}/message_definitions/v1.0/${CONFIG_MAVLINK_DIALECT}.xml
 		${BOARD_DEFCONFIG}

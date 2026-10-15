@@ -57,6 +57,11 @@
 #include <uORB/topics/vehicle_status.h>
 
 #include "streams/ACTUATOR_OUTPUT_STATUS.hpp"
+#if defined(MAVLINK_MSG_ID_NOCTUA_FUEL_CELL_STATUS)
+#include "streams/NOCTUA_FUEL_CELL_STATUS.hpp"
+#include "streams/NOCTUA_FUEL_CELL_CAN_DIAGNOSTICS.hpp"
+#include "streams/NOCTUA_GAS_SENSOR.hpp"
+#endif
 #include "streams/ALTITUDE.hpp"
 #include "streams/ATTITUDE.hpp"
 #include "streams/ATTITUDE_QUATERNION.hpp"
@@ -253,6 +258,11 @@ static_assert(MAV_SENSOR_ROTATION_CUSTOM == static_cast<MAV_SENSOR_ORIENTATION>(
 
 
 static const StreamListItem streams_list[] = {
+#if defined(MAVLINK_MSG_ID_NOCTUA_FUEL_CELL_STATUS)
+	create_stream_list_item<MavlinkStreamNoctuaFuelCellStatus>(),
+	create_stream_list_item<MavlinkStreamNoctuaFuelCellCanDiagnostics>(),
+	create_stream_list_item<MavlinkStreamNoctuaGasSensor>(),
+#endif
 #if defined(HEARTBEAT_HPP)
 	create_stream_list_item<MavlinkStreamHeartbeat>(),
 #endif // HEARTBEAT_HPP

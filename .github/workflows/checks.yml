@@ -45,6 +45,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Prepare pinned Noctua MAVLink
+        if: contains(matrix.check, 'px4_') || startsWith(matrix.check, 'tests')
+        uses: ./.github/actions/setup-noctua-mavlink
+        with:
+          ssh-key: ${{ secrets.NOCTUA_MAVLINK_READ_KEY }}
+
       - name: Building [${{ matrix.check }}]
         run: |
           cd "$GITHUB_WORKSPACE"

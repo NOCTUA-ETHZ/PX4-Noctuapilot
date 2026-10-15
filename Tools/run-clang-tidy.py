@@ -109,12 +109,11 @@ def run_tidy(args, tmpdir, build_path, queue):
                                      tmpdir, build_path, args.header_filter,
                                      args.extra_arg, args.extra_arg_before)
 
-    try:
-      subprocess.check_call(invocation, stdin=None, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'))
-    except subprocess.CalledProcessError as e:
-      sys.stdout.write(f'failed on {name} --> {" ".join(invocation)}\n')
-      # Now run again to see the actual output
-      subprocess.call(invocation, stdin=None)
+    process = subprocess.Popen(invocation, stdin=None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output, _ = process.communicate()
+    if process.returncode != 0:
+      sys.stdout.write(f'failed on {name} (exit {process.returncode}) --> {" ".join(invocation)}\n')
+      sys.stdout.write(output.decode(errors='replace'))
       global tidy_failures
       tidy_failures = tidy_failures + 1
 
