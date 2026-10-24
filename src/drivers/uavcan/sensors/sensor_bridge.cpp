@@ -37,6 +37,11 @@
 
 #include "sensor_bridge.hpp"
 #include <cassert>
+#include <parameters/param.h>
+
+#if defined(CONFIG_UAVCAN_SENSOR_RC_INPUT)
+#include "rc_input.hpp"
+#endif
 
 #if defined(CONFIG_UAVCAN_SENSOR_ACCEL)
 #include "accel.hpp"
@@ -87,6 +92,16 @@
  */
 void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge *> &list)
 {
+#if defined(CONFIG_UAVCAN_SENSOR_RC_INPUT)
+	int32_t uavcan_sub_rc = 0;
+	param_get(param_find("UAVCAN_SUB_RC"), &uavcan_sub_rc);
+
+	if (uavcan_sub_rc != 0) {
+		list.add(new UavcanRcInputBridge(node));
+	}
+
+#endif
+
 	// airspeed
 #if defined(CONFIG_UAVCAN_SENSOR_AIRSPEED)
 	int32_t uavcan_sub_aspd = 1;

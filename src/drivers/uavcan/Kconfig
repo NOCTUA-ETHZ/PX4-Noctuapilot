@@ -86,6 +86,10 @@ if DRIVERS_UAVCAN
         bool "Subscribe to Rangefinder:                 uavcan::equipment::range_sensor::Measurement"
         default y
 
+    config UAVCAN_SENSOR_RC_INPUT
+        bool "Subscribe to RC Input:                    dronecan::sensors::rc::RCInput"
+        default y
+
     config UAVCAN_SENSOR_SAFETY_BUTTON
         bool "Subscribe to Safety Button:               ardupilot::indication::Button"
         default y
