@@ -35,6 +35,7 @@ Most common types of peripherals (sensors, ESCs, and servos) that are DroneCAN/U
 Supported hardware includes (this is not an exhaustive list):
 
 - [ESC/Motor controllers](../dronecan/escs.md)
+- [RC receiver adapters (Noctua v1.17)](rc_input.md)
 - Airspeed sensors
   - [Holybro High Precision DroneCAN Airspeed Sensor - DLVR](https://holybro.com/collections/sensors/products/high-precision-dronecan-airspeed-sensor-dlvr)
   - [RaccoonLab airspeed sensor](https://docs.raccoonlab.co/guide/airspeed/)

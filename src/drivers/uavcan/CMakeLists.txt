@@ -181,6 +181,7 @@ px4_add_module(
 		sensors/ice_status.cpp
 		sensors/hygrometer.cpp
 		sensors/safety_button.cpp
+		sensors/rc_input.cpp
 	MODULE_CONFIG
 		module.yaml
 	DEPENDS

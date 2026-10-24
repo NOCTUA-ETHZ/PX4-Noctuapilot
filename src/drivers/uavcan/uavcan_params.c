@@ -436,3 +436,29 @@ PARAM_DEFINE_INT32(UAVCAN_SUB_RNG, 0);
  * @group UAVCAN
  */
 PARAM_DEFINE_INT32(UAVCAN_SUB_BTN, 0);
+
+/**
+ * Enable DroneCAN RC input
+ *
+ * Subscribe to dronecan.sensors.rc.RCInput as the primary RC input.
+ * Disable other UART/RCIN receivers: this does not provide RC arbitration.
+ *
+ * @boolean
+ * @reboot_required true
+ * @group UAVCAN
+ */
+PARAM_DEFINE_INT32(UAVCAN_SUB_RC, 0);
+
+/**
+ * DroneCAN RC source node ID
+ *
+ * Zero selects the first healthy receiver. A nonzero value accepts only that
+ * node. The first healthy receiver's node and device ID remain selected until
+ * restart, including after signal loss. Use a fixed node ID for flight.
+ *
+ * @min 0
+ * @max 127
+ * @reboot_required true
+ * @group UAVCAN
+ */
+PARAM_DEFINE_INT32(UAVCAN_RC_ID, 0);

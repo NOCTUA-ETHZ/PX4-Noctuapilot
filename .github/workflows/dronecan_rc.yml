@@ -1,0 +1,31 @@
+name: DroneCAN RC regression
+
+on:
+  push:
+    paths:
+      - 'src/drivers/uavcan/**'
+      - 'msg/InputRc.msg'
+      - '.github/workflows/dronecan_rc.yml'
+  pull_request:
+    paths:
+      - 'src/drivers/uavcan/**'
+      - 'msg/InputRc.msg'
+      - '.github/workflows/dronecan_rc.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  host-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Initialize DroneCAN dependencies
+        run: git submodule update --init --recursive src/drivers/uavcan/libdronecan
+      - name: Install generator dependencies
+        run: pip install 'setuptools<81' empy==3.3.4 pyyaml
+      - name: Test serialized RC transfers with sanitizers
+        run: python src/drivers/uavcan/sensors/rc_input_test/run.py
