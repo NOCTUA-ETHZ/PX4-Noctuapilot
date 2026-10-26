@@ -52,10 +52,10 @@ void UavcanRcTelemetry::update()
 			    !std::isfinite(b.discharged_mah) || !std::isfinite(b.remaining) || b.remaining < 0) { return; }
 
 			frame.bytes[6] = 0x08;
-			frame.put(bounded(b.voltage_v * 10., 65535), 2);
-			frame.put(bounded(b.current_a * 10., 65535), 2);
-			frame.put(bounded(b.discharged_mah, 0xffffff), 3);
-			frame.put(bounded(b.remaining * 100., 100), 1);
+			frame.put(bounded(double(b.voltage_v) * 10., 65535), 2);
+			frame.put(bounded(double(b.current_a) * 10., 65535), 2);
+			frame.put(bounded(double(b.discharged_mah), 0xffffff), 3);
+			frame.put(bounded(double(b.remaining) * 100., 100), 1);
 			break;
 		}
 
@@ -70,10 +70,10 @@ void UavcanRcTelemetry::update()
 			frame.bytes[6] = 0x02;
 			frame.put(uint32_t(int32_t(round(g.latitude_deg * 1e7))), 4);
 			frame.put(uint32_t(int32_t(round(g.longitude_deg * 1e7))), 4);
-			frame.put(bounded(g.vel_m_s * 36., 65535), 2); // 0.1 km/h
+			frame.put(bounded(double(g.vel_m_s) * 36., 65535), 2); // 0.1 km/h
 			const double heading = fmod(double(g.cog_rad) * 180. / M_PI + 360., 360.);
 			frame.put(bounded(heading * 100., 35999), 2);
-			frame.put(bounded(g.altitude_msl_m + 1000., 65535), 2);
+			frame.put(bounded(double(g.altitude_msl_m) + 1000., 65535), 2);
 			frame.put(g.satellites_used, 1);
 			break;
 		}
