@@ -462,3 +462,15 @@ PARAM_DEFINE_INT32(UAVCAN_SUB_RC, 0);
  * @group UAVCAN
  */
 PARAM_DEFINE_INT32(UAVCAN_RC_ID, 0);
+
+/**
+ * Enable CRSF telemetry over DroneCAN
+ *
+ * Requires UAVCAN_SUB_RC=1, a fixed UAVCAN_RC_ID and the custom Noctua
+ * MatekL431-RC firmware. Sends battery, GPS, attitude and mode to the RC.
+ *
+ * @boolean
+ * @reboot_required true
+ * @group UAVCAN
+ */
+PARAM_DEFINE_INT32(UAVCAN_RC_TEL, 0);

@@ -1,6 +1,8 @@
 // Copyright (c) 2026 PX4 Development Team. All rights reserved.
 // SPDX-License-Identifier: BSD-3-Clause
 #include "rc_input.hpp"
+#include "rc_telemetry.hpp"
+#include "crsf_telemetry_wire.hpp"
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -104,6 +106,96 @@ public:
 		assert(receiver.spinOnce() >= 0);
 	}
 };
+
+battery_status_s test_battery_status{};
+sensor_gps_s test_sensor_gps{};
+vehicle_attitude_s test_vehicle_attitude{};
+vehicle_status_s test_vehicle_status{};
+uavcan::tunnel::Targetted telemetry_packet;
+unsigned telemetry_received = 0;
+static void receive_telemetry(const uavcan::ReceivedDataStructure<uavcan::tunnel::Targetted> &msg)
+{
+	telemetry_packet = msg; ++telemetry_received;
+}
+static void test_telemetry()
+{
+	test_node_id = 42;
+	Node px4(1), matek(42);
+	uavcan::Subscriber<uavcan::tunnel::Targetted> sub(matek);
+	assert(sub.start(&receive_telemetry) >= 0);
+	UavcanRcTelemetry bridge(px4);
+	assert(bridge.init() == 0);
+	auto tick = [&]() {
+		test_now += 100000; test_last.timestamp_last_signal = test_now;
+		bridge.update();
+
+		for (auto &frame : px4.driver.interfaces[0].output) {
+			matek.driver.interfaces[0].input.push_back({frame, matek.clock.getMonotonic()});
+		}
+
+		px4.driver.interfaces[0].output.clear();
+		assert(matek.spinOnce() >= 0);
+	};
+	test_last.rc_lost = true;
+	tick(); assert(telemetry_received == 0);
+	test_last.rc_lost = false; test_last.rc_failsafe = false;
+	test_last.input_source = input_rc_s::RC_INPUT_SOURCE_DRONECAN;
+	test_battery_status = {test_now, true, 50.1f, 12.3f, 1234.f, .75f};
+	test_sensor_gps = {test_now, 3, 15, 47.0, -8.0, 500.f, 20.f, float(M_PI / 2)};
+	test_vehicle_attitude.timestamp = test_now; test_vehicle_attitude.q[0] = 1.f;
+	test_vehicle_status = {test_now, vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION};
+	const uint8_t types[] = {0x08, 0x02, 0x1e, 0x21};
+	auto be = [](const uint8_t *p, unsigned n) { uint32_t v = 0; while (n--) { v = (v << 8) | *p++; } return v; };
+
+	for (unsigned i = 0; i < 4; ++i) {
+		tick(); assert(telemetry_received == i + 1);
+		assert(telemetry_packet.target_node == 42 && telemetry_packet.protocol.protocol == 255);
+		assert(telemetry_packet.serial_id == -1 && telemetry_packet.options == 0 && telemetry_packet.baudrate == 0);
+		auto &b = telemetry_packet.buffer;
+		uint8_t bytes[120];
+
+		for (unsigned j = 0; j < b.size(); ++j) { bytes[j] = b[j]; }
+
+		assert(noctua_crsf::valid(bytes, b.size())); assert(bytes[6] == types[i]);
+		const uint8_t *payload = bytes + 7;
+
+		if (i == 0) { assert(be(payload, 2) == 501 && be(payload + 2, 2) == 123 && be(payload + 4, 3) == 1234 && payload[7] == 75); }
+
+		if (i == 1) { assert(int32_t(be(payload, 4)) == 470000000 && int32_t(be(payload + 4, 4)) == -80000000); assert(be(payload + 8, 2) == 720 && be(payload + 10, 2) == 9000 && be(payload + 12, 2) == 1500 && payload[14] == 15); }
+
+		if (i == 2) { for (unsigned j = 0; j < 6; ++j) { assert(payload[j] == 0); } }
+
+		if (i == 3) { assert(!strcmp(reinterpret_cast<const char *>(payload), "Mission")); }
+
+		for (unsigned n = 0; n < b.size(); ++n) { assert(!noctua_crsf::valid(bytes, n)); }
+
+		for (unsigned j = 0; j < b.size(); ++j) { bytes[j] ^= 1; assert(!noctua_crsf::valid(bytes, b.size())); bytes[j] ^= 1; }
+	}
+
+	test_now += 3000000;
+
+	for (unsigned i = 0; i < 4; ++i) { tick(); }
+
+	assert(telemetry_received == 4);
+	test_battery_status.timestamp = test_now; test_battery_status.remaining = NAN;
+	tick(); assert(telemetry_received == 4);
+	test_last.rc_failsafe = true;
+
+	for (unsigned i = 0; i < 4; ++i) { tick(); }
+
+	assert(telemetry_received == 4);
+	noctua_crsf::Frame command(0x32); command.put(1, 1); command.finish();
+	assert(!noctua_crsf::valid(command.bytes, command.size));
+	noctua_crsf::Frame text(0x21);
+
+	for (unsigned i = 0; i < 17; ++i) { text.put('x', 1); } text.put(0, 1); text.finish();
+
+	assert(!noctua_crsf::valid(text.bytes, text.size));
+	test_node_id = 0; UavcanRcTelemetry disabled(px4);
+	assert(disabled.init() == 0); disabled.update(); assert(px4.driver.interfaces[0].output.empty());
+	bridge.print_status();
+	puts("PASS: production telemetry, real DroneCAN, units, frame integrity, stale-data and failsafe suppression");
+}
 
 using Rc = dronecan::sensors::rc::RCInput;
 static Rc channels(unsigned count = 16)
@@ -231,5 +323,6 @@ int main()
 		sender.send(receiver, channels());
 		assert(!test_last.rc_lost);
 	}
+	test_telemetry();
 	puts("PASS: real DroneCAN transfers, channel bounds, source locking, quality, failsafe, stale/partial transfers and timeout recovery");
 }
