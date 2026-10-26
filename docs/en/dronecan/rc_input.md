@@ -4,7 +4,7 @@ This branch accepts `dronecan.sensors.rc.RCInput` from an AP_Periph RC adapter
 and publishes it to PX4's primary `input_rc` topic. The normal RC calibration,
 channel mapping, switches and manual-control loss handling remain in use.
 It is disabled by default. This is an RC input bridge, not a CRSF serial tunnel:
-flight-controller telemetry is not returned to the receiver over CAN.
+flight-controller telemetry requires the optional [Noctua telemetry extension](rc_telemetry.md) and custom Matek firmware.
 
 ## Matek CAN-L431 and ExpressLRS
 

@@ -99,9 +99,10 @@ void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge
 
 	if (uavcan_sub_rc != 0) {
 		list.add(new UavcanRcInputBridge(node));
-        int32_t telemetry = 0;
-        param_get(param_find("UAVCAN_RC_TEL"), &telemetry);
-        if (telemetry != 0) { list.add(new UavcanRcTelemetry(node)); }
+		int32_t telemetry = 0;
+		param_get(param_find("UAVCAN_RC_TEL"), &telemetry);
+
+		if (telemetry != 0) { list.add(new UavcanRcTelemetry(node)); }
 	}
 
 #endif
