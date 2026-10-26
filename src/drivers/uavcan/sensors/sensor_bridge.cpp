@@ -41,6 +41,7 @@
 
 #if defined(CONFIG_UAVCAN_SENSOR_RC_INPUT)
 #include "rc_input.hpp"
+#include "rc_telemetry.hpp"
 #endif
 
 #if defined(CONFIG_UAVCAN_SENSOR_ACCEL)
@@ -98,6 +99,9 @@ void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge
 
 	if (uavcan_sub_rc != 0) {
 		list.add(new UavcanRcInputBridge(node));
+        int32_t telemetry = 0;
+        param_get(param_find("UAVCAN_RC_TEL"), &telemetry);
+        if (telemetry != 0) { list.add(new UavcanRcTelemetry(node)); }
 	}
 
 #endif
