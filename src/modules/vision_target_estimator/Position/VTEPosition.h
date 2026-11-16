@@ -219,6 +219,8 @@ private:
 	using EstimatorStateCovariance = KF_position::SquareMatrixState;
 	using AxisEstimatorStates = EstimatorState[vtest::Axis::size];
 
+	/** Reject non-finite or impossible state covariance before publishing target guidance. */
+	bool filterStateIsValid() const;
 	bool initEstimator(const AxisEstimatorStates &state_init);
 	bool performUpdateStep(const matrix::Vector3f &vehicle_acc_ned);
 	void predictionStep(const matrix::Vector3f &acc, float dt);
