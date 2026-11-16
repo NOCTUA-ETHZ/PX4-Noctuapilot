@@ -78,6 +78,7 @@ public:
 """,
     })
     topics = {
+        "airspeed_validated": "uint64_t timestamp; float indicated_airspeed_m_s; int8_t airspeed_source; static constexpr int8_t SOURCE_SENSOR_1=1, SOURCE_SENSOR_3=3;",
         "battery_status": "uint64_t timestamp; bool connected; float voltage_v, current_a, discharged_mah, remaining;",
         "sensor_gps": "uint64_t timestamp; uint8_t fix_type, satellites_used; double latitude_deg, longitude_deg; float altitude_msl_m, vel_m_s, cog_rad;",
         "vehicle_attitude": "uint64_t timestamp; float q[4];",

@@ -43,7 +43,7 @@ void UavcanRcTelemetry::update()
 
 	noctua_crsf::Frame frame(0);
 
-	switch (_next++ % 4) {
+	switch (_next++ % 5) {
 	case 0: {
 			battery_status_s b{};
 
@@ -125,6 +125,18 @@ void UavcanRcTelemetry::update()
 
 			for (unsigned i = 0; i <= strlen(mode); ++i) { frame.put(mode[i], 1); }
 
+			break;
+		}
+	case 4: {
+			airspeed_validated_s a{};
+
+			if (!_airspeed.copy(&a) || !fresh(a.timestamp, now) ||
+			    a.airspeed_source < airspeed_validated_s::SOURCE_SENSOR_1 ||
+			    a.airspeed_source > airspeed_validated_s::SOURCE_SENSOR_3 ||
+			    !std::isfinite(a.indicated_airspeed_m_s) || a.indicated_airspeed_m_s < 0.f) { return; }
+
+			frame.bytes[6] = 0x0a;
+			frame.put(bounded(double(a.indicated_airspeed_m_s) * 36., 65535), 2); // IAS, 0.1 km/h
 			break;
 		}
 	}

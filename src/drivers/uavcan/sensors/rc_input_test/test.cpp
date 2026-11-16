@@ -107,6 +107,7 @@ public:
 	}
 };
 
+airspeed_validated_s test_airspeed_validated{};
 battery_status_s test_battery_status{};
 sensor_gps_s test_sensor_gps{};
 vehicle_attitude_s test_vehicle_attitude{};
@@ -144,10 +145,11 @@ static void test_telemetry()
 	test_sensor_gps = {test_now, 3, 15, 47.0, -8.0, 500.f, 20.f, float(M_PI / 2)};
 	test_vehicle_attitude.timestamp = test_now; test_vehicle_attitude.q[0] = 1.f;
 	test_vehicle_status = {test_now, vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION};
-	const uint8_t types[] = {0x08, 0x02, 0x1e, 0x21};
+	test_airspeed_validated = {test_now, 15.f, 1};
+	const uint8_t types[] = {0x08, 0x02, 0x1e, 0x21, 0x0a};
 	auto be = [](const uint8_t *p, unsigned n) { uint32_t v = 0; while (n--) { v = (v << 8) | *p++; } return v; };
 
-	for (unsigned i = 0; i < 4; ++i) {
+	for (unsigned i = 0; i < 5; ++i) {
 		tick(); assert(telemetry_received == i + 1);
 		assert(telemetry_packet.target_node == 42 && telemetry_packet.protocol.protocol == 255);
 		assert(telemetry_packet.serial_id == -1 && telemetry_packet.options == 0 && telemetry_packet.baudrate == 0);
@@ -167,6 +169,8 @@ static void test_telemetry()
 
 		if (i == 3) { assert(!strcmp(reinterpret_cast<const char *>(payload), "Mission")); }
 
+		if (i == 4) { assert(be(payload, 2) == 540 && b.size() == 10); }
+
 		for (unsigned n = 0; n < b.size(); ++n) { assert(!noctua_crsf::valid(bytes, n)); }
 
 		for (unsigned j = 0; j < b.size(); ++j) { bytes[j] ^= 1; assert(!noctua_crsf::valid(bytes, b.size())); bytes[j] ^= 1; }
@@ -174,16 +178,16 @@ static void test_telemetry()
 
 	test_now += 3000000;
 
-	for (unsigned i = 0; i < 4; ++i) { tick(); }
+	for (unsigned i = 0; i < 5; ++i) { tick(); }
 
-	assert(telemetry_received == 4);
+	assert(telemetry_received == 5);
 	test_battery_status.timestamp = test_now; test_battery_status.remaining = NAN;
-	tick(); assert(telemetry_received == 4);
+	tick(); assert(telemetry_received == 5);
 	test_last.rc_failsafe = true;
 
-	for (unsigned i = 0; i < 4; ++i) { tick(); }
+	for (unsigned i = 0; i < 5; ++i) { tick(); }
 
-	assert(telemetry_received == 4);
+	assert(telemetry_received == 5);
 	noctua_crsf::Frame command(0x32); command.put(1, 1); command.finish();
 	assert(!noctua_crsf::valid(command.bytes, command.size));
 	noctua_crsf::Frame text(0x21);
@@ -191,6 +195,30 @@ static void test_telemetry()
 	for (unsigned i = 0; i < 17; ++i) { text.put('x', 1); } text.put(0, 1); text.finish();
 
 	assert(!noctua_crsf::valid(text.bytes, text.size));
+
+	test_last.rc_failsafe = false;
+	auto airspeed_cycle = [&](float value, int8_t source, int64_t age, bool expected, uint16_t wire = 0) {
+		const unsigned before = telemetry_received;
+		test_airspeed_validated = {uint64_t(int64_t(test_now) - age), value, source};
+		for (unsigned i = 0; i < 5; ++i) { tick(); }
+		assert(telemetry_received == before + unsigned(expected));
+		if (expected) {
+			assert(telemetry_packet.buffer[6] == 0x0a);
+			assert((uint16_t(telemetry_packet.buffer[7]) << 8 | telemetry_packet.buffer[8]) == wire);
+		}
+	};
+	airspeed_cycle(15.f, 1, 0, true, 540);
+	airspeed_cycle(0.f, 2, 0, true, 0);
+	airspeed_cycle(2000.f, 3, 0, true, 65535);
+	airspeed_cycle(NAN, 1, 0, false);
+	airspeed_cycle(INFINITY, 1, 0, false);
+	airspeed_cycle(-1.f, 1, 0, false);
+	for (int8_t source : {-1, 0, 4}) { airspeed_cycle(15.f, source, 0, false); }
+	airspeed_cycle(15.f, 1, 1000001, false);
+	airspeed_cycle(15.f, 1, -1000000, false);
+	noctua_crsf::Frame oversized_airspeed(0x0a);
+	oversized_airspeed.put(540, 3); oversized_airspeed.finish();
+	assert(!noctua_crsf::valid(oversized_airspeed.bytes, oversized_airspeed.size));
 	test_node_id = 0; UavcanRcTelemetry disabled(px4);
 	assert(disabled.init() == 0); disabled.update(); assert(px4.driver.interfaces[0].output.empty());
 	bridge.print_status();

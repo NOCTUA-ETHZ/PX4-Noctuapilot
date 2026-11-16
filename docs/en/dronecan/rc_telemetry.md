@@ -1,6 +1,6 @@
 # Noctua CRSF telemetry over DroneCAN
 
-This separate feature branch adds battery, GPS, attitude and flight-mode
+This separate feature branch adds battery, GPS, IAS, attitude and flight-mode
 telemetry to the RC input bridge. It requires the **custom MatekL431-RC
 firmware** supplied with this change. RP1/DBR4 keep their normal ELRS firmware
 and CRSF UART mode. Stock Matek firmware does not forward these messages.
@@ -39,6 +39,21 @@ On the radio, enable ELRS telemetry (`Std`, not `Off` or armed-suppressed `Race`
 and use EdgeTX's Discover new sensors. Radio refresh rate depends on the ELRS
 packet rate and telemetry ratio.
 
+## Updating an existing installation for IAS
+
+Update **both** PX4 and the custom Matek firmware: the previous Matek build
+rejects the new airspeed frame. Existing parameters and wiring stay the same.
+Use the [Matek flashing guide](matek_flashing.md), restore the matching PX4
+telemetry build, and run **Discover new sensors** again on the radio with a
+healthy airspeed sensor connected. If no airspeed sensor appears, check
+`listener airspeed_validated` for a fresh timestamp, source 1–3 and finite IAS.
+Your EdgeTX version must support CRSF airspeed frame `0x0A`.
+
+Verify the radio's IAS against the indicated (not true or GPS) airspeed in PX4.
+Check sensor-loss behavior separately: the value must become stale rather than
+being replaced by a fabricated zero. IAS forwarding is a new addition and still
+requires this hardware check.
+
 ## What is sent
 
 - Primary battery voltage/current, consumed mAh and remaining percent. Unknown
@@ -47,10 +62,17 @@ packet rate and telemetry ratio.
 - GPS latitude/longitude, groundspeed, course, MSL altitude, satellite count.
   A valid 3D fix is required. Speed is encoded as 0.1 km/h, altitude with the
   CRSF +1000 m offset.
+- Indicated airspeed (IAS) from `airspeed_validated.indicated_airspeed_m_s`,
+  using a selected physical sensor (sources 1–3). Disabled, ground-minus-wind
+  and synthetic sources are suppressed. Samples older than one second, future
+  timestamps, negative values, NaN and infinity are not sent. A valid zero is sent.
+  CRSF frame `0x0A` carries unsigned big-endian IAS in 0.1 km/h, saturated at
+  65535. EdgeTX exposes it as the airspeed sensor (typically `ASpd`); GPS speed
+  remains groundspeed.
 - Attitude: pitch, roll, yaw.
 - Common flight modes; unmapped modes display `Other`.
 
-The sender rotates one frame every 100 ms: up to 2.5 Hz per type before radio
+The sender rotates one frame every 100 ms: up to 2 Hz per type before radio
 bandwidth limits. Stale/invalid source data skips its slot. No fuel-cell-specific
 fields, MAVLink, binding commands or configuration messages are forwarded.
 

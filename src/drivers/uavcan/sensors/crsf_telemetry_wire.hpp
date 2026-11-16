@@ -33,6 +33,7 @@ inline bool valid(const uint8_t *p, size_t n)
     switch (p[2]) {
     case 0x02: return n==19;
     case 0x08: return n==12;
+    case 0x0a: return n==6;
     case 0x1e: return n==10;
     case 0x21: return n>=5 && n<=20 && p[n-2]==0;
     default: return false;

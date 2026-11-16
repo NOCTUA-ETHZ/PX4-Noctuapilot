@@ -4,6 +4,7 @@
 #include <uavcan/tunnel/Targetted.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/input_rc.h>
+#include <uORB/topics/airspeed_validated.h>
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/vehicle_attitude.h>
@@ -20,6 +21,7 @@ public:
 private:
 	uavcan::Publisher<uavcan::tunnel::Targetted> _publisher;
 	uORB::Subscription _rc{ORB_ID(input_rc)};
+	uORB::Subscription _airspeed{ORB_ID(airspeed_validated)};
 	uORB::Subscription _battery{ORB_ID(battery_status)};
 	uORB::Subscription _gps{ORB_ID(vehicle_gps_position)};
 	uORB::Subscription _attitude{ORB_ID(vehicle_attitude)};
