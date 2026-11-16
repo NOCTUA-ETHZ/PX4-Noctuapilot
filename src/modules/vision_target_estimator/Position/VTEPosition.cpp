@@ -126,6 +126,12 @@ bool VTEPosition::init()
 
 void VTEPosition::resetFilter()
 {
+	if (_estimator_initialized) {
+		landing_target_pose_s invalid_pose{};
+		invalid_pose.timestamp = nowUs();
+		_target_pose_pub.publish(invalid_pose);
+	}
+
 	_estimator_initialized = false;
 	_last_relative_meas_fused_time = 0;
 	_bias.set = false;
@@ -171,12 +177,26 @@ void VTEPosition::update(const Vector3f &acc_ned)
 		predictionStep(acc_ned, dt);
 		perf_end(_vte_predict_perf);
 
+		if (!filterStateIsValid()) {
+			resetFilter();
+			PX4_WARN("VTE position covariance invalid after prediction; filter reset");
+			return;
+		}
+
 		_last_predict = now_us;
 	}
 
 	// Update with the newest observations, fuse if the filter is initialised,
 	// and publish any resulting innovations.
-	if (performUpdateStep(acc_ned)) {
+	const bool position_fused = performUpdateStep(acc_ned);
+
+	if (_estimator_initialized && !filterStateIsValid()) {
+		resetFilter();
+		PX4_WARN("VTE position covariance invalid after fusion; filter reset");
+		return;
+	}
+
+	if (position_fused) {
 		_last_update = _last_predict;
 	}
 
@@ -188,6 +208,34 @@ void VTEPosition::update(const Vector3f &acc_ned)
 
 		publishTarget();
 	}
+}
+
+bool VTEPosition::filterStateIsValid() const
+{
+	for (int axis = 0; axis < vtest::Axis::size; ++axis) {
+		const KF_position &filter = _target_est_pos[axis];
+		const auto &state = filter.getState();
+		const auto &cov = filter.getStateCovariance();
+
+		if (!state.isAllFinite() || !cov.isAllFinite()) {
+			return false;
+		}
+
+		for (int row = 0; row < vtest::State::size; ++row) {
+			if (cov(row, row) <= 0.f) {
+				return false;
+			}
+
+			for (int col = 0; col < row; ++col) {
+				// The covariance between two states cannot exceed their variances.
+				if (fabsf(cov(row, col)) > sqrtf(cov(row, row) * cov(col, col))) {
+					return false;
+				}
+			}
+		}
+	}
+
+	return true;
 }
 
 bool VTEPosition::initEstimator(const AxisEstimatorStates &state_init)
