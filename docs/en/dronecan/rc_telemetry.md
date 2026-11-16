@@ -7,6 +7,9 @@ and CRSF UART mode. Stock Matek firmware does not forward these messages.
 
 ## Setup
 
+See [Matek flashing and parameter setup](matek_flashing.md) for the Pixhawk/Mission
+Planner update procedure and ready-to-load parameter files.
+
 Complete [RC input setup](rc_input.md) first. Wire receiver TX to Matek RX3,
 receiver RX to Matek TX3, GND to GND and regulated 5 V. Both UART wires are needed.
 
@@ -21,6 +24,7 @@ Example configuration (change node IDs to match your bus):
 | PX4 | RC_CRSF_PRT_CFG | 0 |
 | Matek | CAN_NODE | 42 |
 | Matek | RC_TEL_NODE | 1 |
+| Matek | RC_PORT | 2 |
 | Matek | RC_PROTOCOLS | 512 |
 | Matek | RC1_PORT_OPTIONS | 0 |
 | Matek | RC_MSGRATE | 50 |
@@ -68,7 +72,10 @@ Both sides stop forwarding on RC loss. PX4 suppresses stale uORB samples.
 The radio must indicate telemetry loss; no fake zero measurements are sent.
 `uavcan status` reports queued/failed transmissions, not confirmed RF delivery.
 
-## Bench acceptance (not yet performed on hardware)
+## Bench acceptance
+
+Flashing, parameter-file loading and operation were reported working by the user
+on 2026-11-16. Completion of every acceptance check below has not been recorded.
 
 With propeller removed and actuators secured:
 
