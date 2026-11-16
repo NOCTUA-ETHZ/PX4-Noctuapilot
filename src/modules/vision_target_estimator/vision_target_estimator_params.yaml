@@ -30,6 +30,7 @@ parameters:
           2 : Set to true to use the target relative position from vision-based data if available. (+4)
           3 : Set to true to use the mission land point. Ignored if target GNSS position enabled. (+8)
           4 : Set to true to use the target GNSS velocity if available. (+16)
+          5 : Set to true to use relative GNSS position in NED (+32). Overrides target GNSS and mission position to avoid double-counting the same GNSS baseline.
       type: bitmask
       bit:
         0: target GNSS position
@@ -37,6 +38,7 @@ parameters:
         2: vision relative position
         3: mission position
         4: target GNSS velocity
+        5: relative GNSS position
       default: 14
     VTE_TASK_MASK:
       description:
@@ -274,6 +276,19 @@ parameters:
       type: float
       default: 0.3
       unit: m/s
+      min: 0.01
+      max: 5.0
+      decimal: 2
+    VTE_RGPS_NOISE:
+      description:
+        short: Minimum relative GNSS position standard deviation
+        long: |-
+          Applied independently to each NED axis when fusing the relative RTK baseline.
+          This floor covers unmodelled antenna offsets and prevents overconfidence even
+          when the GNSS receiver reports centimetre-level accuracy.
+      type: float
+      default: 0.1
+      unit: m
       min: 0.01
       max: 5.0
       decimal: 2
