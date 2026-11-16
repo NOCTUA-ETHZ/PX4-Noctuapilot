@@ -8,6 +8,9 @@ flight-controller telemetry is not returned to the receiver over CAN.
 
 ## Matek CAN-L431 and ExpressLRS
 
+For flashing without a CANable and the Mission Planner parameter-file workaround,
+follow [Flash and configure the Matek through a Pixhawk](matek_flashing.md).
+
 Use the stock **MatekL431-RC** AP_Periph firmware (not the generic sensor build).
 No custom Matek source change is required. A node already running this RC build
 only needs its configuration checked; a generic CAN-L431 needs the RC firmware
