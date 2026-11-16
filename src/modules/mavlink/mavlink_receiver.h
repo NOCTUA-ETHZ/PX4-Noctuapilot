@@ -129,6 +129,7 @@
 
 # if defined(CONFIG_MODULES_VISION_TARGET_ESTIMATOR) && CONFIG_MODULES_VISION_TARGET_ESTIMATOR
 #  include <uORB/topics/fiducial_marker_pos_report.h>
+#  include <uORB/topics/relative_gnss_position.h>
 #  include <uORB/topics/fiducial_marker_yaw_report.h>
 #  include <uORB/topics/target_gnss.h>
 # endif // CONFIG_MODULES_VISION_TARGET_ESTIMATOR
@@ -389,6 +390,7 @@ private:
 	uORB::Publication<fiducial_marker_pos_report_s>			_fiducial_marker_pos_report_pub {ORB_ID(fiducial_marker_pos_report)};
 	uORB::Publication<fiducial_marker_yaw_report_s>			_fiducial_marker_yaw_report_pub{ORB_ID(fiducial_marker_yaw_report)};
 	uORB::Publication<target_gnss_s>		_target_gnss_pub{ORB_ID(target_gnss)};
+	uORB::Publication<relative_gnss_position_s>	_relative_gnss_position_pub{ORB_ID(relative_gnss_position)};
 	param_t _param_vte_en{PARAM_INVALID};
 	hrt_abstime _vte_en_invalid_warn_last{0};
 # endif // CONFIG_MODULES_VISION_TARGET_ESTIMATOR
