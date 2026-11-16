@@ -624,6 +624,13 @@ else
 	#
 	navigator start
 
+	# Start the vision target estimator when its input path is enabled.
+	# VTE_EN also gates TARGET_RELATIVE forwarding in mavlink_receiver.
+	if param compare -s VTE_EN 1
+	then
+		vision_target_estimator start
+	fi
+
 	#
 	# Start a thermal calibration if required.
 	#
