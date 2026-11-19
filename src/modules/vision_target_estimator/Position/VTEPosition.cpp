@@ -59,6 +59,7 @@ VTEPosition::VTEPosition() :
 	_target_pose_pub.advertise();
 	_target_estimator_state_pub.advertise();
 	_vte_aid_gps_pos_target_pub.advertise();
+	_vte_aid_gps_pos_relative_pub.advertise();
 	_vte_aid_gps_pos_mission_pub.advertise();
 	_vte_aid_gps_vel_uav_pub.advertise();
 	_vte_aid_gps_vel_target_pub.advertise();
@@ -126,6 +127,12 @@ bool VTEPosition::init()
 
 void VTEPosition::resetFilter()
 {
+	if (_estimator_initialized) {
+		landing_target_pose_s invalid_pose{};
+		invalid_pose.timestamp = nowUs();
+		_target_pose_pub.publish(invalid_pose);
+	}
+
 	_estimator_initialized = false;
 	_last_relative_meas_fused_time = 0;
 	_bias.set = false;
@@ -171,12 +178,26 @@ void VTEPosition::update(const Vector3f &acc_ned)
 		predictionStep(acc_ned, dt);
 		perf_end(_vte_predict_perf);
 
+		if (!filterStateIsValid()) {
+			resetFilter();
+			PX4_WARN("VTE position covariance invalid after prediction; filter reset");
+			return;
+		}
+
 		_last_predict = now_us;
 	}
 
 	// Update with the newest observations, fuse if the filter is initialised,
 	// and publish any resulting innovations.
-	if (performUpdateStep(acc_ned)) {
+	const bool position_fused = performUpdateStep(acc_ned);
+
+	if (_estimator_initialized && !filterStateIsValid()) {
+		resetFilter();
+		PX4_WARN("VTE position covariance invalid after fusion; filter reset");
+		return;
+	}
+
+	if (position_fused) {
 		_last_update = _last_predict;
 	}
 
@@ -188,6 +209,34 @@ void VTEPosition::update(const Vector3f &acc_ned)
 
 		publishTarget();
 	}
+}
+
+bool VTEPosition::filterStateIsValid() const
+{
+	for (int axis = 0; axis < vtest::Axis::size; ++axis) {
+		const KF_position &filter = _target_est_pos[axis];
+		const auto &state = filter.getState();
+		const auto &cov = filter.getStateCovariance();
+
+		if (!state.isAllFinite() || !cov.isAllFinite()) {
+			return false;
+		}
+
+		for (int row = 0; row < vtest::State::size; ++row) {
+			if (cov(row, row) <= 0.f) {
+				return false;
+			}
+
+			for (int col = 0; col < row; ++col) {
+				// The covariance between two states cannot exceed their variances.
+				if (fabsf(cov(row, col)) > sqrtf(cov(row, row) * cov(col, col))) {
+					return false;
+				}
+			}
+		}
+	}
+
+	return true;
 }
 
 bool VTEPosition::initEstimator(const AxisEstimatorStates &state_init)
@@ -303,8 +352,17 @@ void VTEPosition::processObservations(ObsValidMaskU &fusion_mask,
 		fusion_mask.flags.fuse_vision = processObsVision(observations[obsIndex(ObsType::kFiducialMarker)]);
 	}
 
+	if (_vte_aid_mask.flags.use_relative_gnss_pos) {
+		relative_gnss_position_s report{};
+
+		if (_relative_gnss_position_sub.update(&report)) {
+			fusion_mask.flags.fuse_relative_gnss_pos = processObsRelativeGnss(
+					report, observations[obsIndex(ObsType::kRelativeGnssPos)]);
+		}
+	}
+
 	if (updateUavGpsData()) {
-		if (_vte_aid_mask.flags.use_mission_pos && _mission_land_position.valid) {
+		if (!_vte_aid_mask.flags.use_relative_gnss_pos && _vte_aid_mask.flags.use_mission_pos && _mission_land_position.valid) {
 			fusion_mask.flags.fuse_mission_pos = processObsGNSSPosMission(observations[obsIndex(ObsType::kMissionGpsPos)]);
 		}
 
@@ -318,7 +376,7 @@ void VTEPosition::processObservations(ObsValidMaskU &fusion_mask,
 	if (_target_gnss_sub.update(&target_gnss)) {
 		const bool target_gps_position_valid = isTargetGpsPositionValid(target_gnss);
 
-		if (_vte_aid_mask.flags.use_target_gps_pos && _uav_gps_position.valid
+		if (!_vte_aid_mask.flags.use_relative_gnss_pos && _vte_aid_mask.flags.use_target_gps_pos && _uav_gps_position.valid
 		    && target_gps_position_valid && target_gnss.abs_pos_updated) {
 			fusion_mask.flags.fuse_target_gps_pos = processObsGNSSPosTarget(target_gnss,
 								observations[obsIndex(ObsType::kTargetGpsPos)]);
@@ -626,6 +684,13 @@ VTEPosition::PreBiasReference VTEPosition::selectInitialPosition(const ObsValidM
 		const TargetObs observations[kObsTypeCount], matrix::Vector3f &initial_position,
 		const bool prefer_vision)
 {
+	// The RTK baseline is already a target-relative observation, without the
+	// independent-GNSS bias state. Prefer it as the initial position when available.
+	if (fusion_mask.flags.fuse_relative_gnss_pos) {
+		initial_position = observations[obsIndex(ObsType::kRelativeGnssPos)].meas_xyz;
+		return PreBiasReference::kVision;
+	}
+
 	// Before the GNSS bias is ready, initialize from vision when requested and
 	// otherwise fall back to the available GNSS position source.
 	if (prefer_vision && fusion_mask.flags.fuse_vision) {
@@ -886,6 +951,18 @@ bool VTEPosition::fuseActiveMeasurements(const matrix::Vector3f &vehicle_acc_ned
 	const bool vision_ready = !shouldBlockVisionFusionUntilBiasReady();
 	bool position_fused = false;
 
+	if (fusion_mask.flags.fuse_relative_gnss_pos) {
+		const TargetObs &obs = observations[obsIndex(ObsType::kRelativeGnssPos)];
+
+		if (obs.timestamp != 0 && fuseMeas(vehicle_acc_ned, obs)) {
+			position_fused = true;
+
+			if (!_bias.set) {
+				_pre_bias_reference = PreBiasReference::kVision;
+			}
+		}
+	}
+
 	if (fusion_mask.flags.fuse_target_gps_pos && gnss_ready) {
 		const TargetObs &obs = observations[obsIndex(ObsType::kTargetGpsPos)];
 
@@ -1065,6 +1142,34 @@ bool VTEPosition::processObsGNSSVelTarget(const target_gnss_s &target_gnss, Targ
 }
 
 #endif // CONFIG_VTEST_MOVING
+
+bool VTEPosition::processObsRelativeGnss(const relative_gnss_position_s &report, TargetObs &obs) const
+{
+	if (!isMeasRecent(report.timestamp_sample)) {
+		return false;
+	}
+
+	const Vector3f position(report.rel_pos);
+	const Vector3f variance(report.var);
+
+	if (!position.isAllFinite() || !variance.isAllFinite()
+	    || variance(0) <= 0.f || variance(1) <= 0.f || variance(2) <= 0.f) {
+		return false;
+	}
+
+	obs.type = ObsType::kRelativeGnssPos;
+	obs.timestamp = report.timestamp_sample;
+	obs.meas_xyz = position;
+	const float min_variance = sq(fmaxf(_param_vte_rgps_noise.get(), kMinObservationNoise));
+
+	for (int axis = 0; axis < vtest::Axis::size; ++axis) {
+		obs.updated(axis) = true;
+		obs.meas_h_xyz(axis, vtest::State::pos_rel) = 1.f;
+		obs.meas_unc_xyz(axis) = fmaxf(variance(axis), min_variance);
+	}
+
+	return true;
+}
 
 /*Target GNSS mission observation: [rx + bx, ry + by, rz + bz]*/
 bool VTEPosition::processObsGNSSPosMission(TargetObs &obs)
@@ -1307,6 +1412,10 @@ void VTEPosition::publishInnov(const vte_aid_source3d_s &target_innov, const Obs
 {
 	// Publish innovations
 	switch (type) {
+	case ObsType::kRelativeGnssPos:
+		_vte_aid_gps_pos_relative_pub.publish(target_innov);
+		break;
+
 	case ObsType::kTargetGpsPos:
 		_vte_aid_gps_pos_target_pub.publish(target_innov);
 		break;

@@ -31,5 +31,5 @@ uint8 STATUS_REJECT_EMPTY = 8 # Rejected: history buffer not yet populated
 float32 time_since_meas_ms # [ms] (now - timestamp_sample)
 uint8 history_steps # [-] Number of steps replayed in OOSM (0 if current or failed)
 
-# TOPICS vte_aid_gps_pos_target vte_aid_gps_pos_mission vte_aid_gps_vel_target vte_aid_gps_vel_uav
+# TOPICS vte_aid_gps_pos_relative vte_aid_gps_pos_target vte_aid_gps_pos_mission vte_aid_gps_vel_target vte_aid_gps_vel_uav
 # TOPICS vte_aid_fiducial_marker

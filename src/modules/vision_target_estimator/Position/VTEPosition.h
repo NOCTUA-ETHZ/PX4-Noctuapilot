@@ -54,6 +54,7 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionInterval.hpp>
 #include <uORB/topics/fiducial_marker_pos_report.h>
+#include <uORB/topics/relative_gnss_position.h>
 #include <uORB/topics/landing_target_pose.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_gps.h>
@@ -138,7 +139,8 @@ public:
 	{
 		return _vte_aid_mask.flags.use_vision_pos
 		       || _vte_aid_mask.flags.use_target_gps_pos
-		       || _vte_aid_mask.flags.use_mission_pos;
+		       || _vte_aid_mask.flags.use_mission_pos
+		       || _vte_aid_mask.flags.use_relative_gnss_pos;
 	}
 
 	void print_status() const;
@@ -156,6 +158,7 @@ protected:
 
 	// publish innovations target_estimator_gps_pos
 	uORB::Publication<vte_aid_source3d_s> _vte_aid_gps_pos_target_pub{ORB_ID(vte_aid_gps_pos_target)};
+	uORB::Publication<vte_aid_source3d_s> _vte_aid_gps_pos_relative_pub{ORB_ID(vte_aid_gps_pos_relative)};
 	uORB::Publication<vte_aid_source3d_s> _vte_aid_gps_pos_mission_pub{ORB_ID(vte_aid_gps_pos_mission)};
 	uORB::Publication<vte_aid_source3d_s> _vte_aid_gps_vel_target_pub{ORB_ID(vte_aid_gps_vel_target)};
 	uORB::Publication<vte_aid_source3d_s> _vte_aid_gps_vel_uav_pub{ORB_ID(vte_aid_gps_vel_uav)};
@@ -172,6 +175,7 @@ private:
 		kUavGpsVel,
 		kTargetGpsVel,
 		kFiducialMarker,
+		kRelativeGnssPos,
 		kTypeCount
 	};
 
@@ -207,7 +211,8 @@ private:
 			uint8_t fuse_vision         : 1; ///< bit2: vision relative-position ready to be fused
 			uint8_t fuse_mission_pos    : 1; ///< bit3: mission position ready to be fused
 			uint8_t fuse_target_gps_vel : 1; ///< bit4: target GPS velocity ready to be fused
-			uint8_t reserved            : 3; ///< bits5..7: reserved for future use
+			uint8_t fuse_relative_gnss_pos : 1; ///< bit5: relative RTK position ready to be fused
+			uint8_t reserved            : 2; ///< bits6..7: reserved for future use
 		} flags;
 
 		uint8_t value{0};
@@ -219,6 +224,8 @@ private:
 	using EstimatorStateCovariance = KF_position::SquareMatrixState;
 	using AxisEstimatorStates = EstimatorState[vtest::Axis::size];
 
+	/** Reject non-finite or impossible state covariance before publishing target guidance. */
+	bool filterStateIsValid() const;
 	bool initEstimator(const AxisEstimatorStates &state_init);
 	bool performUpdateStep(const matrix::Vector3f &vehicle_acc_ned);
 	void predictionStep(const matrix::Vector3f &acc, float dt);
@@ -239,7 +246,8 @@ private:
 
 	inline bool hasNewPositionSensorData(const ObsValidMaskU &fusion_mask) const
 	{
-		return fusion_mask.flags.fuse_mission_pos ||
+		return fusion_mask.flags.fuse_relative_gnss_pos ||
+		       fusion_mask.flags.fuse_mission_pos ||
 		       fusion_mask.flags.fuse_target_gps_pos ||
 		       fusion_mask.flags.fuse_vision;
 	}
@@ -257,7 +265,8 @@ private:
 	// Only estimate the GNSS bias if we have a GNSS estimate and vision.
 	inline bool shouldSetBias(const bool has_vision_observation) const
 	{
-		return _pos_rel_gnss.valid && isMeasRecent(_pos_rel_gnss.timestamp) && has_vision_observation;
+		return !_vte_aid_mask.flags.use_relative_gnss_pos
+		       && _pos_rel_gnss.valid && isMeasRecent(_pos_rel_gnss.timestamp) && has_vision_observation;
 	};
 
 	inline bool isBiasAveragingEnabled() const
@@ -340,6 +349,7 @@ private:
 	/* Vision data */
 	bool isVisionDataValid(const fiducial_marker_pos_report_s &fiducial_marker_pose);
 	bool processObsVision(TargetObs &obs);
+	bool processObsRelativeGnss(const relative_gnss_position_s &report, TargetObs &obs) const;
 
 	/* UAV GPS data */
 	bool updateUavGpsData();
@@ -366,6 +376,7 @@ private:
 	uORB::Subscription _vehicle_gps_position_sub{ORB_ID(vehicle_gps_position)};
 	uORB::Subscription _fiducial_marker_pos_report_sub{ORB_ID(fiducial_marker_pos_report)};
 	uORB::Subscription _target_gnss_sub{ORB_ID(target_gnss)};
+	uORB::Subscription _relative_gnss_position_sub{ORB_ID(relative_gnss_position)};
 
 	perf_counter_t _vte_predict_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": VTE prediction")};
 	perf_counter_t _vte_update_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": VTE update")};
@@ -459,6 +470,7 @@ private:
 		(ParamFloat<px4::params::VTE_ACC_UNC_IN>) _param_vte_acc_unc_in,
 		(ParamFloat<px4::params::VTE_GPS_V_NOISE>) _param_vte_gps_vel_noise,
 		(ParamFloat<px4::params::VTE_GPS_P_NOISE>) _param_vte_gps_pos_noise,
+		(ParamFloat<px4::params::VTE_RGPS_NOISE>) _param_vte_rgps_noise,
 		(ParamFloat<px4::params::VTE_EVP_NOISE>) _param_vte_ev_pos_noise,
 		(ParamFloat<px4::params::VTE_POS_NIS_THRE>) _param_vte_pos_nis_thre
 	)

@@ -295,6 +295,13 @@ uint16_t VisionTargetEst::adjustAidMask(const int input_vte_aid_mask)
 
 #endif // CONFIG_VTEST_MOVING
 
+	if (new_aid_mask.flags.use_relative_gnss_pos
+	    && (new_aid_mask.flags.use_target_gps_pos || new_aid_mask.flags.use_mission_pos)) {
+		PX4_WARN("VTE relative GNSS overrides absolute target/mission position aiding to avoid correlated GNSS fusion.");
+		new_aid_mask.flags.use_target_gps_pos = false;
+		new_aid_mask.flags.use_mission_pos = false;
+	}
+
 	if (new_aid_mask.flags.use_target_gps_pos && new_aid_mask.flags.use_mission_pos) {
 		PX4_WARN("VTE invalid aid mask: both target GPS and mission land enabled.");
 		PX4_WARN("Disabling mission land position fusion.");
@@ -309,6 +316,8 @@ void VisionTargetEst::printAidMask()
 	PX4_DEBUG("VTE VTE_AID_MASK config: ");
 
 	if (_vte_aid_mask.flags.use_vision_pos) {PX4_DEBUG("    vision relative position fusion enabled");}
+
+	if (_vte_aid_mask.flags.use_relative_gnss_pos) {PX4_DEBUG("    relative GNSS position fusion enabled");}
 
 	if (_vte_aid_mask.flags.use_target_gps_pos) {PX4_DEBUG("    target GPS position fusion enabled");}
 
@@ -724,6 +733,7 @@ int VisionTargetEst::print_status()
 		 yes_no(_vte_aid_mask.flags.use_vision_pos),
 		 yes_no(_vte_aid_mask.flags.use_target_gps_pos),
 		 yes_no(_vte_aid_mask.flags.use_mission_pos));
+	PX4_INFO("  relative gnss pos: %s", yes_no(_vte_aid_mask.flags.use_relative_gnss_pos));
 	PX4_INFO("  uav gps vel: %s, target gps vel: %s",
 		 yes_no(_vte_aid_mask.flags.use_uav_gps_vel),
 		 yes_no(_vte_aid_mask.flags.use_target_gps_vel));

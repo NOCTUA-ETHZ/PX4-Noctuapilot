@@ -298,6 +298,7 @@ endif()
 if(CONFIG_MODULES_VISION_TARGET_ESTIMATOR)
 	list(APPEND msg_files
 		TargetGnss.msg
+		RelativeGnssPosition.msg
 		VteInput.msg
 		VtePosition.msg
 		VteOrientation.msg

@@ -53,6 +53,7 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/fiducial_marker_pos_report.h>
 #include <uORB/topics/landing_target_pose.h>
+#include <uORB/topics/relative_gnss_position.h>
 #include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/target_gnss.h>
 #include <uORB/topics/vte_position.h>
@@ -101,7 +102,8 @@ enum class FusionMaskOption {
 	kMissionPos,
 	kTargetGpsPos,
 	kUavGpsVel,
-	kTargetGpsVel
+	kTargetGpsVel,
+	kRelativeGnssPos
 };
 
 class VTEPositionTestable : public vte::VTEPosition
@@ -142,10 +144,12 @@ protected:
 		_vision_pub = std::make_unique<uORB::Publication<fiducial_marker_pos_report_s>>(ORB_ID(fiducial_marker_pos_report));
 		_uav_gps_pub = std::make_unique<uORB::Publication<sensor_gps_s>>(ORB_ID(vehicle_gps_position));
 		_target_gps_pub = std::make_unique<uORB::Publication<target_gnss_s>>(ORB_ID(target_gnss));
+		_relative_gnss_pub = std::make_unique<uORB::Publication<relative_gnss_position_s>>(ORB_ID(relative_gnss_position));
 
 		_aid_fiducial_sub = std::make_unique<uORB::SubscriptionData<vte_aid_source3d_s>>(ORB_ID(vte_aid_fiducial_marker));
 		_aid_gps_mission_sub = std::make_unique<uORB::SubscriptionData<vte_aid_source3d_s>>(ORB_ID(vte_aid_gps_pos_mission));
 		_aid_gps_target_sub = std::make_unique<uORB::SubscriptionData<vte_aid_source3d_s>>(ORB_ID(vte_aid_gps_pos_target));
+		_aid_gps_relative_sub = std::make_unique<uORB::SubscriptionData<vte_aid_source3d_s>>(ORB_ID(vte_aid_gps_pos_relative));
 		_aid_gps_vel_uav_sub = std::make_unique<uORB::SubscriptionData<vte_aid_source3d_s>>(ORB_ID(vte_aid_gps_vel_uav));
 		_aid_gps_vel_target_sub = std::make_unique<uORB::SubscriptionData<vte_aid_source3d_s>>(ORB_ID(vte_aid_gps_vel_target));
 		_bias_init_status_sub = std::make_unique<uORB::SubscriptionData<vte_bias_init_status_s>>(ORB_ID(vte_bias_init_status));
@@ -155,6 +159,7 @@ protected:
 		vte_test::flushSubscription(_aid_fiducial_sub);
 		vte_test::flushSubscription(_aid_gps_mission_sub);
 		vte_test::flushSubscription(_aid_gps_target_sub);
+		vte_test::flushSubscription(_aid_gps_relative_sub);
 		vte_test::flushSubscription(_aid_gps_vel_uav_sub);
 		vte_test::flushSubscription(_aid_gps_vel_target_sub);
 		vte_test::flushSubscription(_bias_init_status_sub);
@@ -171,10 +176,12 @@ protected:
 		_aid_gps_vel_target_sub.reset();
 		_aid_gps_vel_uav_sub.reset();
 		_aid_gps_target_sub.reset();
+		_aid_gps_relative_sub.reset();
 		_aid_gps_mission_sub.reset();
 		_aid_fiducial_sub.reset();
 		_bias_init_status_sub.reset();
 		_target_gps_pub.reset();
+		_relative_gnss_pub.reset();
 		_uav_gps_pub.reset();
 		_vision_pub.reset();
 
@@ -212,6 +219,10 @@ protected:
 
 			case FusionMaskOption::kTargetGpsVel:
 				mask.flags.use_target_gps_vel = 1;
+				break;
+
+			case FusionMaskOption::kRelativeGnssPos:
+				mask.flags.use_relative_gnss_pos = 1;
 				break;
 			}
 		}
@@ -316,10 +327,12 @@ protected:
 	std::unique_ptr<uORB::Publication<fiducial_marker_pos_report_s>> _vision_pub;
 	std::unique_ptr<uORB::Publication<sensor_gps_s>> _uav_gps_pub;
 	std::unique_ptr<uORB::Publication<target_gnss_s>> _target_gps_pub;
+	std::unique_ptr<uORB::Publication<relative_gnss_position_s>> _relative_gnss_pub;
 
 	std::unique_ptr<uORB::SubscriptionData<vte_aid_source3d_s>> _aid_fiducial_sub;
 	std::unique_ptr<uORB::SubscriptionData<vte_aid_source3d_s>> _aid_gps_mission_sub;
 	std::unique_ptr<uORB::SubscriptionData<vte_aid_source3d_s>> _aid_gps_target_sub;
+	std::unique_ptr<uORB::SubscriptionData<vte_aid_source3d_s>> _aid_gps_relative_sub;
 	std::unique_ptr<uORB::SubscriptionData<vte_aid_source3d_s>> _aid_gps_vel_uav_sub;
 	std::unique_ptr<uORB::SubscriptionData<vte_aid_source3d_s>> _aid_gps_vel_target_sub;
 	std::unique_ptr<uORB::SubscriptionData<vte_bias_init_status_s>> _bias_init_status_sub;
@@ -414,6 +427,41 @@ TEST_F(VTEPositionTest, InitWithVisionAndLocalVelocity)
 	EXPECT_NEAR(aid.observation_variance[0], kDefaultEvPosVar, kTolerance);
 	EXPECT_NEAR(aid.observation_variance[1], kDefaultEvPosVar, kTolerance);
 	EXPECT_NEAR(aid.observation_variance[2], kDefaultEvPosVar, kTolerance);
+}
+
+// Relative RTK positions must initialize the filter without independent GPS positions.
+TEST_F(VTEPositionTest, InitWithRelativeGnssAndLocalVelocity)
+{
+	enableMask({FusionMaskOption::kRelativeGnssPos});
+	const hrt_abstime vel_time = vte_test::advanceMicroseconds(kStepUs);
+	setLocalVelocity(matrix::Vector3f{}, vel_time);
+
+	relative_gnss_position_s report{};
+	report.timestamp = vte_test::advanceMicroseconds(kStepUs);
+	report.timestamp_sample = report.timestamp;
+	report.target_id = 2;
+	report.rel_pos[0] = 1.f;
+	report.rel_pos[1] = -2.f;
+	report.rel_pos[2] = 0.5f;
+	report.var[0] = 0.0025f;
+	report.var[1] = 0.0025f;
+	report.var[2] = 0.0025f;
+	ASSERT_TRUE(_relative_gnss_pub->publish(report));
+
+	_vte->update(matrix::Vector3f{});
+	ASSERT_TRUE(_vte_state_sub->update());
+	const auto state = _vte_state_sub->get();
+	EXPECT_NEAR(state.rel_pos[0], 1.f, kTolerance);
+	EXPECT_NEAR(state.rel_pos[1], -2.f, kTolerance);
+	EXPECT_NEAR(state.rel_pos[2], 0.5f, kTolerance);
+	EXPECT_TRUE(state.rel_pos_valid);
+
+	ASSERT_TRUE(_aid_gps_relative_sub->update());
+	const auto aid = _aid_gps_relative_sub->get();
+	EXPECT_NEAR(aid.observation_variance[0], 0.01f, kTolerance);
+	EXPECT_NEAR(aid.observation_variance[1], 0.01f, kTolerance);
+	EXPECT_NEAR(aid.observation_variance[2], 0.01f, kTolerance);
+	EXPECT_FALSE(_aid_gps_target_sub->update());
 }
 
 // WHY: Bias averaging can be disabled when the first relative source is already trusted.

@@ -3240,11 +3240,19 @@ MavlinkReceiver::handle_message_target_relative(mavlink_message_t *msg)
 	}
 
 	// Unsupported measurement type
-	if (target_relative.type != LANDING_TARGET_TYPE_VISION_FIDUCIAL) {
+	if (target_relative.type != LANDING_TARGET_TYPE_VISION_FIDUCIAL
+	    && target_relative.type != LANDING_TARGET_TYPE_RADIO_BEACON) {
 		mavlink_log_critical(&_mavlink_log_pub, "target relative: type %" PRIu8 " unsupported.\t",
 				     target_relative.type);
 		events::send<uint8_t>(events::ID("mavlink_rcv_target_rel_unsup_type"), events::Log::Error,
 				      "Target relative: unsupported type {1}", target_relative.type);
+		return;
+	}
+
+	// The RTK baseline is a vehicle-relative displacement already expressed in NED.
+	// Never interpret a radio-source packet as a camera measurement or as an absolute position.
+	if (target_relative.type == LANDING_TARGET_TYPE_RADIO_BEACON
+	    && target_relative.frame != TARGET_OBS_FRAME_LOCAL_OFFSET_NED) {
 		return;
 	}
 
@@ -3296,6 +3304,9 @@ MavlinkReceiver::handle_message_target_relative(mavlink_message_t *msg)
 	}
 
 	if (!vte_enabled) {
+		if (target_relative.type == LANDING_TARGET_TYPE_RADIO_BEACON) {
+			return;
+		}
 
 		// Send the target directly to the precision landing algorithm in local NED frame
 		landing_target_pose_s landing_target_pose{};
@@ -3332,8 +3343,29 @@ MavlinkReceiver::handle_message_target_relative(mavlink_message_t *msg)
 		}
 
 	} else {
+		if (target_relative.type == LANDING_TARGET_TYPE_RADIO_BEACON) {
+			const matrix::Vector3f baseline(target_relative.x, target_relative.y, target_relative.z);
+			const matrix::Vector3f std(target_relative.pos_std);
 
-		// Only supported type: LANDING_TARGET_TYPE_VISION_FIDUCIAL
+			if (!baseline.isAllFinite() || !std.isAllFinite()
+			    || std(0) <= 0.f || std(1) <= 0.f || std(2) <= 0.f
+			    || std(0) > 100.f || std(1) > 100.f || std(2) > 100.f) {
+				return;
+			}
+
+			relative_gnss_position_s report{};
+			report.timestamp = hrt_absolute_time();
+			report.timestamp_sample = _mavlink_timesync.sync_stamp(target_relative.timestamp);
+			report.target_id = target_relative.id;
+			baseline.copyTo(report.rel_pos);
+
+			for (int i = 0; i < 3; ++i) {
+				report.var[i] = std(i) * std(i);
+			}
+
+			_relative_gnss_position_pub.publish(report);
+			return;
+		}
 
 		// Position report
 		fiducial_marker_pos_report_s fiducial_marker_pos_report{};
