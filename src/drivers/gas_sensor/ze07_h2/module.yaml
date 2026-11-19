@@ -1,0 +1,24 @@
+module_name: Winsen ZE07-H2
+serial_config:
+  - command: ze07_h2 start -d ${SERIAL_DEV}
+    port_config_param:
+      name: SENS_ZE07_CFG
+      group: Sensors
+parameters:
+  - group: Sensors
+    definitions:
+      SENS_ZE07_WARM:
+        description:
+          short: ZE07-H2 warm-up time
+          long: |
+            Suppress measurements after opening the UART and after a data
+            outage longer than 5 seconds. The sensor has no ready flag.
+            Winsen specifies up to 3 minutes warm-up and recommends at
+            least 5 minutes on first use. Zero is for bench testing with
+            an already warmed sensor or a serial emulator only.
+        type: int32
+        unit: s
+        min: 0
+        max: 600
+        default: 300
+        reboot_required: true

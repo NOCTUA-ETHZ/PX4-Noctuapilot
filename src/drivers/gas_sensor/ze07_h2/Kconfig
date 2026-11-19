@@ -1,0 +1,5 @@
+menuconfig DRIVERS_GAS_SENSOR_ZE07_H2
+	bool "Winsen ZE07-H2 hydrogen sensor (UART)"
+	default n
+	---help---
+		Publish ZE07-H2 hydrogen measurements using sensor_gas_concentration.

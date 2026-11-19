@@ -1,5 +1,7 @@
 # DFRobot Gas concentration sensor
 
+For the UART-based Winsen hydrogen sensor, see [ZE07-H2](ze07_h2.md).
+
 The driver supports DFRobot Gravity electrochemical gas sensors, including sensors for O2, CO, H2S, NH3, H2, O3, SO2, NO2, HCL, CL2, HF and PH3.
 
 
