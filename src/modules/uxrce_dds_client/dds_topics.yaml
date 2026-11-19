@@ -127,6 +127,18 @@ publications:
     type: px4_msgs::msg::LandingTargetPose
     rate_limit: 50.
 
+  - topic: /fmu/out/vte_aid_gps_pos_target
+    type: px4_msgs::msg::VteAidSource3d
+    rate_limit: 25.
+
+  - topic: /fmu/out/vte_aid_gps_vel_target
+    type: px4_msgs::msg::VteAidSource3d
+    rate_limit: 25.
+
+  - topic: /fmu/out/vte_aid_fiducial_marker
+    type: px4_msgs::msg::VteAidSource3d
+    rate_limit: 25.
+
   - topic: /fmu/out/vte_orientation
     type: px4_msgs::msg::VteOrientation
     rate_limit: 50.
@@ -136,6 +148,9 @@ publications:
 
 # Create uORB::Publication
 subscriptions:
+  - topic: /fmu/in/fiducial_marker_pos_report
+    type: px4_msgs::msg::FiducialMarkerPosReport
+
   - topic: /fmu/in/register_ext_component_request
     type: px4_msgs::msg::RegisterExtComponentRequest
 
