@@ -14,8 +14,12 @@ unsigned test_publications = 0;
 input_rc_s test_last{};
 int32_t test_node_id = 42;
 uint64_t hrt_absolute_time() { return test_now; }
-int param_find(const char *name) { assert(!strcmp(name, "UAVCAN_RC_ID")); return 0; }
-int param_get(int, void *value) { *static_cast<int32_t *>(value) = test_node_id; return 0; }
+int32_t test_backup_id = 0;
+int param_find(const char *name) {
+	if (!strcmp(name, "UAVCAN_RC_ID")) { return 0; }
+	assert(!strcmp(name, "UAVCAN_RC_BK_ID")); return 1;
+}
+int param_get(int param, void *value) { *static_cast<int32_t *>(value) = param == 0 ? test_node_id : test_backup_id; return 0; }
 class Clock : public uavcan::ISystemClock
 {
 public:
@@ -237,6 +241,61 @@ static Rc channels(unsigned count = 16)
 
 	return msg;
 }
+static void test_redundancy()
+{
+	test_node_id = 42; test_backup_id = 43;
+	Node receiver(1);
+	Sender primary(42), backup(43), stranger(44);
+	auto a = channels(), b = channels(); b.rcin[0] = 1800;
+	{
+		UavcanRcInputBridge bridge(receiver); assert(bridge.init() >= 0);
+		const auto count = test_publications;
+		backup.send(receiver, b); bridge.update(); assert(test_publications == count);
+		primary.send(receiver, a); assert(test_last.values[0] == 1000 && !test_last.rc_lost);
+		test_now += 80000; backup.send(receiver, b);
+		assert(test_last.values[0] == 1000);
+		test_now += 19999; bridge.update(); assert(test_last.values[0] == 1000);
+		++test_now; bridge.update();
+		assert(test_last.values[0] == 1800 && !test_last.rc_lost);
+		assert(test_last.timestamp_last_signal == test_now - 20000);
+		primary.send(receiver, a); assert(test_last.values[0] == 1800); // no preemption
+		auto wrong = b; wrong.id = 1; wrong.rcin[0] = 900;
+		backup.send(receiver, wrong); stranger.send(receiver, wrong);
+		assert(test_last.values[0] == 1800);
+		auto failed = b; failed.status |= Rc::STATUS_FAILSAFE;
+		test_now += 10000; backup.send(receiver, failed);
+		assert(!test_last.rc_lost && test_last.values[0] == 1000); // immediate failover
+		auto bad = a; bad.status |= Rc::STATUS_FAILSAFE;
+		primary.send(receiver, bad); assert(test_last.rc_lost && test_last.rc_failsafe);
+		backup.send(receiver, b, 100000); backup.send(receiver, b, -1);
+		assert(test_last.rc_lost);
+		test_now += 20000; backup.send(receiver, b);
+		assert(!test_last.rc_lost && test_last.values[0] == 1800);
+		backup.send(receiver, failed, 10000); // older failure must not overwrite fresh data
+		assert(!test_last.rc_lost);
+		test_now += 100000; bridge.update(); assert(test_last.rc_lost);
+		const auto lost = test_publications; bridge.update(); assert(test_publications == lost);
+		primary.send(receiver, a); assert(!test_last.rc_lost && test_last.values[0] == 1000);
+		backup.send(receiver, b); primary.send(receiver, channels(3));
+		assert(!test_last.rc_lost && test_last.values[0] == 1800);
+	}
+	{
+		UavcanRcInputBridge bridge(receiver); assert(bridge.init() >= 0);
+		test_now += 100000; backup.send(receiver, b); // primary absent on startup
+		assert(!test_last.rc_lost && test_last.values[0] == 1800);
+		primary.send(receiver, a); assert(test_last.values[0] == 1800);
+	}
+	for (int primary_id : {0, 43, -1, 128}) {
+		test_node_id = primary_id; UavcanRcInputBridge bridge(receiver); assert(bridge.init() < 0);
+	}
+	test_node_id = 42;
+	for (int backup_id : {-1, 128}) {
+		test_backup_id = backup_id; UavcanRcInputBridge bridge(receiver); assert(bridge.init() < 0);
+	}
+	test_backup_id = 0;
+	puts("PASS: redundant receivers, startup, timeout/failsafe failover, sticky selection, source isolation, stale data, both lost and recovery");
+}
+
 int main()
 {
 	Node receiver(1);
@@ -351,6 +410,7 @@ int main()
 		sender.send(receiver, channels());
 		assert(!test_last.rc_lost);
 	}
+	test_redundancy();
 	test_telemetry();
 	puts("PASS: real DroneCAN transfers, channel bounds, source locking, quality, failsafe, stale/partial transfers and timeout recovery");
 }

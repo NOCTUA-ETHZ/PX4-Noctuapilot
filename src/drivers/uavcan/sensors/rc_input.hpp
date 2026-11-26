@@ -54,7 +54,8 @@ private:
 	using Callback = uavcan::MethodBinder<UavcanRcInputBridge *,
 	      void (UavcanRcInputBridge::*)(const uavcan::ReceivedDataStructure<RcInput> &)>;
 	void rc_sub_cb(const uavcan::ReceivedDataStructure<RcInput> &msg);
-	void clear_quality();
+	void clear_quality(input_rc_s &report);
+	void select_and_publish(uint64_t now, int updated = -1);
 	static constexpr uint64_t SIGNAL_TIMEOUT_US = 100000;
 
 	uavcan::INode &_node;
@@ -62,6 +63,15 @@ private:
 	uORB::Publication<input_rc_s> _input_rc_pub{ORB_ID(input_rc)};
 	input_rc_s _report{};
 	int32_t _configured_node{0};
+	struct Receiver {
+		input_rc_s report{};
+		int node{-1};
+		int device{-1};
+		uint64_t last_sample{0};
+	};
+	Receiver _receivers[2]{};
+	int32_t _backup_node{0};
+	int _active{-1};
 	int _selected_node{-1};
-	int _selected_device{-1};
+	uint64_t _start_time{0};
 };

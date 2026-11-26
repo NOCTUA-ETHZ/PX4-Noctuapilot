@@ -131,3 +131,72 @@ python src/drivers/uavcan/sensors/rc_input_test/run.py
 Tests cover node/device selection, channel bounds, quality, explicit failsafe,
 short channel arrays, stale/future/partial transfers, timeout boundaries and
 recovery. Host tests and a firmware build do not replace the hardware checks.
+
+## Two receivers: primary and backup
+
+The `feature/dronecan-rc-redundancy` branch adds optional receiver failover.
+Use two ELRS receivers, each connected to a separate Matek node with a unique
+CAN node ID. The existing Matek RC-input firmware can publish both streams.
+
+| PX4 parameter | Example | Meaning |
+| --- | --- | --- |
+| `UAVCAN_SUB_RC` | `1` | Enable DroneCAN RC input |
+| `UAVCAN_RC_ID` | `42` | Primary receiver node |
+| `UAVCAN_RC_BK_ID` | `43` | Backup receiver node; `0` disables redundancy |
+
+Reboot after changing these parameters. Backup mode requires distinct IDs in
+1–127; an automatic primary ID (`0`) with a configured backup is rejected.
+Both receivers must deliver the same channel mapping, calibration, switch
+positions and channel count. Do not simultaneously publish another RC driver
+into the primary `input_rc` instance.
+
+PX4 independently tracks each receiver's channels, failsafe and receive time.
+A usable stream has at least four channels, no failsafe flag and a sample less
+than 100 ms old. This checks transport validity, not whether stick values are
+plausible or the receiver has silently frozen. The first healthy device ID on
+each configured node remains locked until restart.
+
+At startup, the primary is preferred, with a 100 ms grace period before using
+an available backup. Once selected, a healthy receiver stays selected. PX4
+switches to the other healthy receiver when the active stream reports failsafe,
+has fewer than four channels or reaches 100 ms without a fresh sample. A
+recovered primary does not preempt a healthy backup. If the backup later fails,
+a healthy primary can take over again. The timeout is checked by the CAN update
+loop, so 100 ms is the freshness threshold, not a guaranteed end-to-end latency.
+If neither stream is usable, PX4 publishes RC loss for normal downstream failsafe
+handling. Cached backup data retains its original receive time at switchover.
+
+`uavcan status` reports the selected node and both receiver states. Source
+changes are printed with previous/new node IDs. The outgoing `input_rc` stream
+contains only the selected source; its timestamp is not refreshed by standby
+traffic. No independent per-receiver uORB logging topic is added in this version.
+
+### ELRS telemetry
+
+Bind both receivers to the same transmitter with compatible RF settings and
+matching channel configuration. Enable RF telemetry on only one receiver; use
+ELRS **Force telemetry OFF on this receiver** on the backup. PX4 telemetry remains
+addressed to `UAVCAN_RC_ID`, even after control switches to the backup. Therefore
+control can survive primary failure while telemetry to the handset is lost.
+Automatic RF telemetry failover is not implemented. Existing IAS telemetry is
+unchanged. The transmitter, shared CAN bus and shared supply remain common
+failure points.
+
+### Validation
+
+Run the production bridge/serialized DroneCAN host tests with:
+
+```sh
+git submodule update --init --recursive src/drivers/uavcan/libdronecan
+python -m pip install 'empy==3.3.4' 'setuptools<81' pyyaml
+python src/drivers/uavcan/sensors/rc_input_test/run.py
+```
+
+Tests cover disabled-backup compatibility, primary absent at startup, exact
+freshness boundaries, explicit failsafe, invalid channel count, source/device
+isolation, delayed/future transfers, sticky selection, both lost and recovery.
+The existing GPS/battery/attitude/mode/IAS telemetry regression tests also run.
+Host tests use AddressSanitizer/UndefinedBehaviorSanitizer; PX4 clock, parameters
+and uORB are stubbed. A full target build and hardware validation remain required.
+Before flight, bench-check removal of each receiver and Matek, both streams lost,
+reconnection, channel/switch continuity and the configured PX4 RC-loss action.
