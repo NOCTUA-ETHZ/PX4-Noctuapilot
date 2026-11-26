@@ -14,8 +14,12 @@ unsigned test_publications = 0;
 input_rc_s test_last{};
 int32_t test_node_id = 42;
 uint64_t hrt_absolute_time() { return test_now; }
-int param_find(const char *name) { assert(!strcmp(name, "UAVCAN_RC_ID")); return 0; }
-int param_get(int, void *value) { *static_cast<int32_t *>(value) = test_node_id; return 0; }
+int32_t test_backup_id = 0;
+int param_find(const char *name) {
+	if (!strcmp(name, "UAVCAN_RC_ID")) { return 0; }
+	assert(!strcmp(name, "UAVCAN_RC_BK_ID")); return 1;
+}
+int param_get(int param, void *value) { *static_cast<int32_t *>(value) = param == 0 ? test_node_id : test_backup_id; return 0; }
 class Clock : public uavcan::ISystemClock
 {
 public:
@@ -114,9 +118,10 @@ vehicle_attitude_s test_vehicle_attitude{};
 vehicle_status_s test_vehicle_status{};
 uavcan::tunnel::Targetted telemetry_packet;
 unsigned telemetry_received = 0;
+std::vector<uavcan::tunnel::Targetted> telemetry_packets;
 static void receive_telemetry(const uavcan::ReceivedDataStructure<uavcan::tunnel::Targetted> &msg)
 {
-	telemetry_packet = msg; ++telemetry_received;
+	telemetry_packet = msg; ++telemetry_received; telemetry_packets.push_back(msg);
 }
 static void test_telemetry()
 {
@@ -225,6 +230,49 @@ static void test_telemetry()
 	puts("PASS: production telemetry, real DroneCAN, units, frame integrity, stale-data and failsafe suppression");
 }
 
+static void test_telemetry_targets()
+{
+	test_node_id = 42;
+	for (int backup : {43, 0, 42, -1, 128}) {
+		test_backup_id = backup;
+		Node px4(1), observer(60);
+		uavcan::Subscriber<uavcan::tunnel::Targetted> sub(observer);
+		assert(sub.start(&receive_telemetry) >= 0);
+		UavcanRcTelemetry bridge(px4); assert(bridge.init() == 0);
+		test_last.input_source = input_rc_s::RC_INPUT_SOURCE_DRONECAN;
+		test_last.rc_lost = false; test_last.rc_failsafe = false;
+		auto tick = [&]() {
+			telemetry_packets.clear(); bridge.update();
+			for (auto &frame : px4.driver.interfaces[0].output) {
+				observer.driver.interfaces[0].input.push_back({frame, observer.clock.getMonotonic()});
+			}
+			px4.driver.interfaces[0].output.clear(); assert(observer.spinOnce() >= 0);
+		};
+		const uint8_t types[] = {0x08, 0x02, 0x1e, 0x21, 0x0a};
+		for (unsigned i = 0; i < 5; ++i) {
+			test_now += 100000; test_last.timestamp_last_signal = test_now;
+			test_battery_status = {test_now, true, 50.f, 1.f, 10.f, .8f};
+			test_sensor_gps = {test_now, 3, 15, 47., 8., 500.f, 20.f, 0.f};
+			test_vehicle_attitude.timestamp = test_now;
+			test_vehicle_status.timestamp = test_now;
+			test_airspeed_validated = {test_now, 15.f, 1};
+			tick(); assert(telemetry_packets.size() == (backup == 43 ? 2u : 1u));
+			assert(telemetry_packets[0].target_node == 42);
+			assert(telemetry_packets[0].buffer[6] == types[i]);
+			if (backup == 43) {
+				assert(telemetry_packets[1].target_node == 43);
+				assert(telemetry_packets[0].buffer == telemetry_packets[1].buffer);
+			}
+		}
+		test_now += 100000; test_last.rc_lost = true; tick(); assert(telemetry_packets.empty());
+		test_now += 100000; test_last.rc_lost = false; test_last.rc_failsafe = true;
+		test_last.timestamp_last_signal = test_now; tick(); assert(telemetry_packets.empty());
+		test_now += 100001; test_last.rc_failsafe = false; tick(); assert(telemetry_packets.empty());
+	}
+	test_backup_id = 0;
+	puts("PASS: all five telemetry types duplicated to both configured nodes; disabled/invalid/duplicate backup and RC health gates");
+}
+
 using Rc = dronecan::sensors::rc::RCInput;
 static Rc channels(unsigned count = 16)
 {
@@ -237,6 +285,61 @@ static Rc channels(unsigned count = 16)
 
 	return msg;
 }
+static void test_redundancy()
+{
+	test_node_id = 42; test_backup_id = 43;
+	Node receiver(1);
+	Sender primary(42), backup(43), stranger(44);
+	auto a = channels(), b = channels(); b.rcin[0] = 1800;
+	{
+		UavcanRcInputBridge bridge(receiver); assert(bridge.init() >= 0);
+		const auto count = test_publications;
+		backup.send(receiver, b); bridge.update(); assert(test_publications == count);
+		primary.send(receiver, a); assert(test_last.values[0] == 1000 && !test_last.rc_lost);
+		test_now += 80000; backup.send(receiver, b);
+		assert(test_last.values[0] == 1000);
+		test_now += 19999; bridge.update(); assert(test_last.values[0] == 1000);
+		++test_now; bridge.update();
+		assert(test_last.values[0] == 1800 && !test_last.rc_lost);
+		assert(test_last.timestamp_last_signal == test_now - 20000);
+		primary.send(receiver, a); assert(test_last.values[0] == 1800); // no preemption
+		auto wrong = b; wrong.id = 1; wrong.rcin[0] = 900;
+		backup.send(receiver, wrong); stranger.send(receiver, wrong);
+		assert(test_last.values[0] == 1800);
+		auto failed = b; failed.status |= Rc::STATUS_FAILSAFE;
+		test_now += 10000; backup.send(receiver, failed);
+		assert(!test_last.rc_lost && test_last.values[0] == 1000); // immediate failover
+		auto bad = a; bad.status |= Rc::STATUS_FAILSAFE;
+		primary.send(receiver, bad); assert(test_last.rc_lost && test_last.rc_failsafe);
+		backup.send(receiver, b, 100000); backup.send(receiver, b, -1);
+		assert(test_last.rc_lost);
+		test_now += 20000; backup.send(receiver, b);
+		assert(!test_last.rc_lost && test_last.values[0] == 1800);
+		backup.send(receiver, failed, 10000); // older failure must not overwrite fresh data
+		assert(!test_last.rc_lost);
+		test_now += 100000; bridge.update(); assert(test_last.rc_lost);
+		const auto lost = test_publications; bridge.update(); assert(test_publications == lost);
+		primary.send(receiver, a); assert(!test_last.rc_lost && test_last.values[0] == 1000);
+		backup.send(receiver, b); primary.send(receiver, channels(3));
+		assert(!test_last.rc_lost && test_last.values[0] == 1800);
+	}
+	{
+		UavcanRcInputBridge bridge(receiver); assert(bridge.init() >= 0);
+		test_now += 100000; backup.send(receiver, b); // primary absent on startup
+		assert(!test_last.rc_lost && test_last.values[0] == 1800);
+		primary.send(receiver, a); assert(test_last.values[0] == 1800);
+	}
+	for (int primary_id : {0, 43, -1, 128}) {
+		test_node_id = primary_id; UavcanRcInputBridge bridge(receiver); assert(bridge.init() < 0);
+	}
+	test_node_id = 42;
+	for (int backup_id : {-1, 128}) {
+		test_backup_id = backup_id; UavcanRcInputBridge bridge(receiver); assert(bridge.init() < 0);
+	}
+	test_backup_id = 0;
+	puts("PASS: redundant receivers, startup, timeout/failsafe failover, sticky selection, source isolation, stale data, both lost and recovery");
+}
+
 int main()
 {
 	Node receiver(1);
@@ -351,6 +454,8 @@ int main()
 		sender.send(receiver, channels());
 		assert(!test_last.rc_lost);
 	}
+	test_redundancy();
 	test_telemetry();
+	test_telemetry_targets();
 	puts("PASS: real DroneCAN transfers, channel bounds, source locking, quality, failsafe, stale/partial transfers and timeout recovery");
 }

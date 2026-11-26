@@ -27,6 +27,7 @@ private:
 	uORB::Subscription _attitude{ORB_ID(vehicle_attitude)};
 	uORB::Subscription _status{ORB_ID(vehicle_status)};
 	int32_t _target{0};
+	int32_t _backup_target{0};
 	uint64_t _last{0};
 	unsigned _next{0}, _sent{0}, _failed{0};
 };
