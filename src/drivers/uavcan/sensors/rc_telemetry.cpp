@@ -7,6 +7,7 @@
 #include <matrix/math.hpp>
 #include <cmath>
 #include <cstring>
+#include <initializer_list>
 static uint32_t bounded(double v, uint32_t limit)
 {
 	return !std::isfinite(v) || v <= 0 ? 0 : v >= limit ? limit : uint32_t(round(v));
@@ -18,11 +19,17 @@ static bool fresh(uint64_t stamp, uint64_t now, uint64_t age = 1000000)
 int UavcanRcTelemetry::init()
 {
 	param_get(param_find("UAVCAN_RC_ID"), &_target);
+	param_get(param_find("UAVCAN_RC_BK_ID"), &_backup_target);
 
 	if (_target < 1 || _target > 127) {
 		_target = 0;
 		PX4_WARN("RC telemetry needs fixed UAVCAN_RC_ID");
 		return 0; // A telemetry misconfiguration must not stop CAN/RC input.
+	}
+
+	// An invalid or duplicate backup must not duplicate traffic to the primary.
+	if (_backup_target < 1 || _backup_target > 127 || _backup_target == _target) {
+		_backup_target = 0;
 	}
 
 	_publisher.setPriority(uavcan::TransferPriority::Lowest);
@@ -154,9 +161,18 @@ void UavcanRcTelemetry::update()
 
 	for (unsigned i = 0; i < frame.size; ++i) { msg.buffer.push_back(frame.bytes[i]); }
 
-	if (_publisher.broadcast(msg) >= 0) { ++_sent; } else { ++_failed; }
+	// Send the same frame to every configured receiver, independent of RC selection.
+	// Each ELRS receiver is responsible for enabling/disabling its RF telemetry.
+	for (const int32_t target : {_target, _backup_target}) {
+		if (target == 0) { continue; }
+
+		msg.target_node = target;
+
+		if (_publisher.broadcast(msg) >= 0) { ++_sent; } else { ++_failed; }
+	}
 }
 void UavcanRcTelemetry::print_status() const
 {
-	PX4_INFO("RC telemetry: target %ld sent %u failed %u", (long)_target, _sent, _failed);
+	PX4_INFO("RC telemetry: primary %ld backup %ld sent %u failed %u",
+		 (long)_target, (long)_backup_target, _sent, _failed);
 }

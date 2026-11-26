@@ -118,9 +118,10 @@ vehicle_attitude_s test_vehicle_attitude{};
 vehicle_status_s test_vehicle_status{};
 uavcan::tunnel::Targetted telemetry_packet;
 unsigned telemetry_received = 0;
+std::vector<uavcan::tunnel::Targetted> telemetry_packets;
 static void receive_telemetry(const uavcan::ReceivedDataStructure<uavcan::tunnel::Targetted> &msg)
 {
-	telemetry_packet = msg; ++telemetry_received;
+	telemetry_packet = msg; ++telemetry_received; telemetry_packets.push_back(msg);
 }
 static void test_telemetry()
 {
@@ -227,6 +228,49 @@ static void test_telemetry()
 	assert(disabled.init() == 0); disabled.update(); assert(px4.driver.interfaces[0].output.empty());
 	bridge.print_status();
 	puts("PASS: production telemetry, real DroneCAN, units, frame integrity, stale-data and failsafe suppression");
+}
+
+static void test_telemetry_targets()
+{
+	test_node_id = 42;
+	for (int backup : {43, 0, 42, -1, 128}) {
+		test_backup_id = backup;
+		Node px4(1), observer(60);
+		uavcan::Subscriber<uavcan::tunnel::Targetted> sub(observer);
+		assert(sub.start(&receive_telemetry) >= 0);
+		UavcanRcTelemetry bridge(px4); assert(bridge.init() == 0);
+		test_last.input_source = input_rc_s::RC_INPUT_SOURCE_DRONECAN;
+		test_last.rc_lost = false; test_last.rc_failsafe = false;
+		auto tick = [&]() {
+			telemetry_packets.clear(); bridge.update();
+			for (auto &frame : px4.driver.interfaces[0].output) {
+				observer.driver.interfaces[0].input.push_back({frame, observer.clock.getMonotonic()});
+			}
+			px4.driver.interfaces[0].output.clear(); assert(observer.spinOnce() >= 0);
+		};
+		const uint8_t types[] = {0x08, 0x02, 0x1e, 0x21, 0x0a};
+		for (unsigned i = 0; i < 5; ++i) {
+			test_now += 100000; test_last.timestamp_last_signal = test_now;
+			test_battery_status = {test_now, true, 50.f, 1.f, 10.f, .8f};
+			test_sensor_gps = {test_now, 3, 15, 47., 8., 500.f, 20.f, 0.f};
+			test_vehicle_attitude.timestamp = test_now;
+			test_vehicle_status.timestamp = test_now;
+			test_airspeed_validated = {test_now, 15.f, 1};
+			tick(); assert(telemetry_packets.size() == (backup == 43 ? 2u : 1u));
+			assert(telemetry_packets[0].target_node == 42);
+			assert(telemetry_packets[0].buffer[6] == types[i]);
+			if (backup == 43) {
+				assert(telemetry_packets[1].target_node == 43);
+				assert(telemetry_packets[0].buffer == telemetry_packets[1].buffer);
+			}
+		}
+		test_now += 100000; test_last.rc_lost = true; tick(); assert(telemetry_packets.empty());
+		test_now += 100000; test_last.rc_lost = false; test_last.rc_failsafe = true;
+		test_last.timestamp_last_signal = test_now; tick(); assert(telemetry_packets.empty());
+		test_now += 100001; test_last.rc_failsafe = false; tick(); assert(telemetry_packets.empty());
+	}
+	test_backup_id = 0;
+	puts("PASS: all five telemetry types duplicated to both configured nodes; disabled/invalid/duplicate backup and RC health gates");
 }
 
 using Rc = dronecan::sensors::rc::RCInput;
@@ -412,5 +456,6 @@ int main()
 	}
 	test_redundancy();
 	test_telemetry();
+	test_telemetry_targets();
 	puts("PASS: real DroneCAN transfers, channel bounds, source locking, quality, failsafe, stale/partial transfers and timeout recovery");
 }

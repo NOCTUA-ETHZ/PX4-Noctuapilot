@@ -469,7 +469,7 @@ PARAM_DEFINE_INT32(UAVCAN_RC_ID, 0);
  * Zero disables backup. Otherwise requires a nonzero, distinct UAVCAN_RC_ID.
  * Switches on active receiver failsafe or 100 ms signal timeout if the other
  * receiver is healthy. Stays on the selected receiver until it fails.
- * Telemetry remains targeted to UAVCAN_RC_ID.
+ * Telemetry is sent to both configured nodes when UAVCAN_RC_TEL is enabled.
  *
  * @min 0
  * @max 127
@@ -482,7 +482,8 @@ PARAM_DEFINE_INT32(UAVCAN_RC_BK_ID, 0);
  * Enable CRSF telemetry over DroneCAN
  *
  * Requires UAVCAN_SUB_RC=1, a fixed UAVCAN_RC_ID and the custom Noctua
- * MatekL431-RC firmware. Sends battery, GPS, attitude and mode to the RC.
+ * MatekL431-RC firmware. Sends battery, GPS, attitude, mode and IAS to both
+ * configured RC nodes. Disable unwanted RF telemetry in the ELRS receiver.
  *
  * @boolean
  * @reboot_required true

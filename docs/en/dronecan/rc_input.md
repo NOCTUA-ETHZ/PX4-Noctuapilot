@@ -175,10 +175,14 @@ traffic. No independent per-receiver uORB logging topic is added in this version
 
 Bind both receivers to the same transmitter with compatible RF settings and
 matching channel configuration. Enable RF telemetry on only one receiver; use
-ELRS **Force telemetry OFF on this receiver** on the backup. PX4 telemetry remains
-addressed to `UAVCAN_RC_ID`, even after control switches to the backup. Therefore
-control can survive primary failure while telemetry to the handset is lost.
-Automatic RF telemetry failover is not implemented. Existing IAS telemetry is
+ELRS **Force telemetry OFF on this receiver** on the backup. PX4 sends each telemetry frame to both `UAVCAN_RC_ID` and `UAVCAN_RC_BK_ID`,
+regardless of which receiver supplies control. Setting the backup ID to zero
+keeps single-target operation. Per-target transmission failures do not prevent
+attempting the other target. The existing valid-RC and telemetry-data freshness
+gates still apply; both streams lost stops telemetry forwarding. Each Matek also
+retains its local RC-health gate. RF telemetry suppression is configured in ELRS,
+not by omitting CAN frames. If the receiver with RF telemetry enabled fails,
+handset telemetry can still be lost. Automatic RF telemetry failover is not implemented. Existing IAS telemetry is
 unchanged. The transmitter, shared CAN bus and shared supply remain common
 failure points.
 
